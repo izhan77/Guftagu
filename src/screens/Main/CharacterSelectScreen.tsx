@@ -126,6 +126,13 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
       style={styles.container}
     >
       <SafeAreaView style={styles.safe}>
+        <TouchableOpacity
+          style={styles.backBtnContainer}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+        </TouchableOpacity>
         {/* Header Section */}
         <View style={styles.header}>
           <Text style={styles.greeting}>Hey {name}! 👋</Text>
@@ -252,8 +259,22 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  backBtnContainer: {
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    backgroundColor: "#7C5CBF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 25,
+    shadowColor: "#7C5CBF",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 5,
+  },
   safe: { flex: 1, paddingHorizontal: 20 },
-  header: { alignItems: "center", marginTop: 40, zIndex: 10 },
+  header: { alignItems: "center", marginTop: 10, zIndex: 10 },
   greeting: { fontSize: 26, fontFamily: "Poppins-ExtraBold", color: "#000000" },
   title: {
     fontSize: 16,
