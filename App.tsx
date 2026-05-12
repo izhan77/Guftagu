@@ -9,7 +9,7 @@ import SplashScreen from "./src/screens/Onboarding/SplashScreen";
 import AgeInputScreen from "./src/screens/Onboarding/AgeGateScreen";
 import NameInputScreen from "./src/screens/Onboarding/NameInputScreen";
 import ParentConsentScreen from "./src/screens/Onboarding/ParentConsentScreen";
-import ParentSignupScreen from "./src/screens/Auth/ParentSignupScreen";
+import ParentEmailScreen from "./src/screens/Auth/ParentEmailScreen";
 import CharacterSelectScreen from "./src/screens/Main/CharacterSelectScreen";
 import SessionScreen from "./src/screens/Main/SessionScreen";
 
@@ -38,9 +38,16 @@ export default function App() {
         <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="AgeInput" component={AgeInputScreen} />
         <Stack.Screen name="ParentConsent" component={ParentConsentScreen} />
-        <Stack.Screen name="ParentSignup" component={ParentSignupScreen} />
+        <Stack.Screen
+          name="ParentEmail"
+          component={ParentEmailScreen}
+          options={{ headerShown: false }}
+        />
         <Stack.Screen name="NameInput" component={NameInputScreen} />
-        <Stack.Screen name="CharacterSelect" component={CharacterSelectScreen} />
+        <Stack.Screen
+          name="CharacterSelect"
+          component={CharacterSelectScreen}
+        />
         <Stack.Screen name="Session" component={SessionScreen} />
       </Stack.Navigator>
     </NavigationContainer>

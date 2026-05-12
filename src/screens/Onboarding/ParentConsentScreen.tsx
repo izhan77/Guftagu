@@ -36,7 +36,7 @@ export default function ParentConsentScreen({ navigation, route }: any) {
 
           <TouchableOpacity 
             style={styles.button}
-            onPress={() => navigation.navigate('ParentSignup', { ageGroup })}
+            onPress={() => navigation.navigate('ParentEmail', { ageGroup })}
           >
             <Text style={styles.buttonText}>Continue to Parent Setup</Text>
             <Ionicons name="arrow-forward" size={20} color="white" />
