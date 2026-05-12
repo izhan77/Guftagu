@@ -6,7 +6,6 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-// Ensure this path matches where you saved your hook
 import { usePreloadAssets } from '../../hooks/usePreloadAssets'; 
 
 const { width } = Dimensions.get('window');
@@ -22,11 +21,9 @@ const AGE_OPTIONS = [
 export default function AgeInputScreen({ navigation }: any) {
   const [selected, setSelected] = useState<string | null>(null);
   
-  // Gate the screen rendering until fonts and logo are ready
   const isReady = usePreloadAssets();
 
   if (!isReady) {
-    // Return a themed loading state to prevent "jank"
     return <View style={{ flex: 1, backgroundColor: '#EEE6FF' }} />;
   }
 
@@ -148,6 +145,7 @@ const styles = StyleSheet.create({
     color: '#8A8A8A',
     textAlign: 'center',
     marginTop: 4,
+    marginBottom: 4,
     lineHeight: 22,
   },
   optionsContainer: {

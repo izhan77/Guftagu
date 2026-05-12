@@ -3,7 +3,6 @@ import { View, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 
-// Screens - Ensure these paths are exactly correct
 import SplashScreen from './src/screens/Onboarding/SplashScreen';
 import AgeInputScreen from './src/screens/Onboarding/AgeGateScreen';
 
@@ -13,7 +12,6 @@ export default function App() {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    // Artificial delay to simulate asset loading
     const timer = setTimeout(() => setIsReady(true), 1000);
     return () => clearTimeout(timer);
   }, []);
