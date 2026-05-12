@@ -11,6 +11,7 @@ import NameInputScreen from "./src/screens/Onboarding/NameInputScreen";
 import ParentConsentScreen from "./src/screens/Onboarding/ParentConsentScreen";
 import ParentSignupScreen from "./src/screens/Auth/ParentSignupScreen";
 import CharacterSelectScreen from "./src/screens/Main/CharacterSelectScreen";
+import SessionScreen from "./src/screens/Main/SessionScreen";
 
 const Stack = createStackNavigator();
 
@@ -30,7 +31,6 @@ export default function App() {
         screenOptions={
           {
             headerShown: false,
-            // 'none' prevents the "sliding" animation which can highlight the pop-in
             animationEnabled: false,
           } as any
         }
@@ -41,6 +41,7 @@ export default function App() {
         <Stack.Screen name="ParentSignup" component={ParentSignupScreen} />
         <Stack.Screen name="NameInput" component={NameInputScreen} />
         <Stack.Screen name="CharacterSelect" component={CharacterSelectScreen} />
+        <Stack.Screen name="Session" component={SessionScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
