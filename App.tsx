@@ -1,21 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text } from 'react-native';
+import React from 'react';
+import { View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
+import { usePreloadAssets } from './src/hooks/usePreloadAssets'; 
 
+// Screens
 import SplashScreen from './src/screens/Onboarding/SplashScreen';
 import AgeInputScreen from './src/screens/Onboarding/AgeGateScreen';
 
 const Stack = createStackNavigator();
 
 export default function App() {
-  const [isReady, setIsReady] = useState(false);
+  const isReady = usePreloadAssets();
 
-  useEffect(() => {
-    const timer = setTimeout(() => setIsReady(true), 1000);
-    return () => clearTimeout(timer);
-  }, []);
-
+  // If assets aren't ready, keep showing the splash or a blank view 
+  // that matches the splash background color.
   if (!isReady) {
     return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
   }
@@ -26,6 +25,7 @@ export default function App() {
         initialRouteName="Splash"
         screenOptions={{ 
           headerShown: false,
+          // 'none' prevents the "sliding" animation which can highlight the pop-in
           animationEnabled: false 
         } as any}
       >
