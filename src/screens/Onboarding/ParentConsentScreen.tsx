@@ -1,0 +1,68 @@
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+
+export default function ParentConsentScreen({ navigation, route }: any) {
+  const { ageGroup } = route.params || { ageGroup: 'Under 14' };
+
+  return (
+    <LinearGradient colors={['#F7F2FF', '#FFFFFF']} style={styles.container}>
+      <SafeAreaView style={styles.safe}>
+        <ScrollView contentContainerStyle={styles.scroll}>
+          
+          <View style={styles.shieldCircle}>
+            <Ionicons name="shield-checkmark" size={50} color="#7C5CBF" />
+          </View>
+
+          <Text style={styles.title}>Parental Guidance</Text>
+          <Text style={styles.subtitle}>
+            To keep our journey safe and fun, we need a parent to help set things up!
+          </Text>
+
+          <View style={styles.infoCard}>
+            {[
+              { icon: 'eye-outline', text: 'Monitor activity & energy points' },
+              { icon: 'lock-closed-outline', text: 'AI safety filters are always active' },
+              { icon: 'notifications-outline', text: 'Get updates on learning progress' }
+            ].map((item, index) => (
+              <View key={index} style={styles.bullet}>
+                <Ionicons name={item.icon as any} size={22} color="#7C5CBF" />
+                <Text style={styles.bulletText}>{item.text}</Text>
+              </View>
+            ))}
+          </View>
+
+          <TouchableOpacity 
+            style={styles.button}
+            onPress={() => navigation.navigate('ParentSignup', { ageGroup })}
+          >
+            <Text style={styles.buttonText}>Continue to Parent Setup</Text>
+            <Ionicons name="arrow-forward" size={20} color="white" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Text style={styles.backButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    </LinearGradient>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  safe: { flex: 1 },
+  scroll: { alignItems: 'center', padding: 24 },
+  shieldCircle: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#7C5CBF15', justifyContent: 'center', alignItems: 'center', marginTop: 20, marginBottom: 20 },
+  title: { fontSize: 28, fontFamily: 'Poppins-ExtraBold', color: '#2D2D2D', textAlign: 'center' },
+  subtitle: { fontSize: 16, fontFamily: 'Poppins-SemiBold', color: '#8A8A8A', textAlign: 'center', marginTop: 10, lineHeight: 24 },
+  infoCard: { backgroundColor: '#F9F9F9', borderRadius: 24, padding: 24, width: '100%', marginTop: 30 },
+  bullet: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
+  bulletText: { marginLeft: 14, fontSize: 15, fontFamily: 'Poppins-Medium', color: '#444', flex: 1 },
+  button: { width: '100%', backgroundColor: '#7C5CBF', paddingVertical: 18, borderRadius: 20, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 40, gap: 10, elevation: 4 },
+  buttonText: { color: 'white', fontSize: 17, fontFamily: 'Poppins-Bold' },
+  backButton: { marginTop: 20 },
+  backButtonText: { color: '#AAA', fontSize: 14, fontFamily: 'Poppins-SemiBold' }
+});
