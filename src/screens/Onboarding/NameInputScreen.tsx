@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function NameInputScreen({ navigation, route }: any) {
   const [name, setName] = useState("");
@@ -16,6 +17,15 @@ export default function NameInputScreen({ navigation, route }: any) {
   return (
     <LinearGradient colors={["#EEE6FF", "#FFFFFF"]} style={styles.container}>
       <SafeAreaView style={styles.safe}>
+        {/* Consistent Purple Back Button */}
+        <TouchableOpacity
+          style={styles.backBtnContainer}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+        </TouchableOpacity>
+
         <View style={styles.content}>
           <Text style={styles.title}>What should we{"\n"}call you?</Text>
           <Text style={styles.subtitle}>
@@ -37,9 +47,9 @@ export default function NameInputScreen({ navigation, route }: any) {
               { backgroundColor: name.length > 2 ? "#7C5CBF" : "#D1D1D1" },
             ]}
             onPress={() =>
-              navigation.navigate("MainApp", {
-                screen: "Chat",
-                params: { name, ageGroup },
+              navigation.navigate("CharacterSelect", {
+                name,
+                ageGroup,
               })
             }
             disabled={name.length <= 2}
@@ -55,6 +65,22 @@ export default function NameInputScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safe: { flex: 1 },
+  backBtnContainer: {
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    backgroundColor: "#7C5CBF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 40,
+    marginLeft: 24,
+    // Matching shadow
+    shadowColor: "#7C5CBF",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 5,
+  },
   content: { padding: 24, flex: 1, justifyContent: "center" },
   title: { fontSize: 36, fontFamily: "Poppins-ExtraBold", color: "#2D2D2D" },
   subtitle: {

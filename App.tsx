@@ -10,6 +10,7 @@ import AgeInputScreen from "./src/screens/Onboarding/AgeGateScreen";
 import NameInputScreen from "./src/screens/Onboarding/NameInputScreen";
 import ParentConsentScreen from "./src/screens/Onboarding/ParentConsentScreen";
 import ParentSignupScreen from "./src/screens/Auth/ParentSignupScreen";
+import CharacterSelectScreen from "./src/screens/Main/CharacterSelectScreen";
 
 const Stack = createStackNavigator();
 
@@ -39,6 +40,7 @@ export default function App() {
         <Stack.Screen name="ParentConsent" component={ParentConsentScreen} />
         <Stack.Screen name="ParentSignup" component={ParentSignupScreen} />
         <Stack.Screen name="NameInput" component={NameInputScreen} />
+        <Stack.Screen name="CharacterSelect" component={CharacterSelectScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
