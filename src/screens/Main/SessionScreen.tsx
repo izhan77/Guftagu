@@ -16,6 +16,7 @@ import { VideoView, useVideoPlayer } from "expo-video";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
+import { getCharacterResponse } from "../../services/gemini" // ← ADD THIS
 
 const { width, height } = Dimensions.get("window");
 
@@ -37,64 +38,46 @@ const CHAR_ASSETS: Record<string, CharacterVideos> = {
 };
 
 export default function SessionScreen({ navigation, route }: any) {
-  // SAFE DATA EXTRACTION
-  const { character } = route.params || {};
-  
-  // FIX: Safety check to prevent "undefined" error
+  const { character, childName } = route.params || {};
   const charId = (character?.id && character.id in CHAR_ASSETS) ? character.id : "zara";
   const themeColor = character?.buttonColor || "#FF9500";
   const activeAssets = CHAR_ASSETS[charId];
 
-  const [status, setStatus] = useState<"idle" | "listening" | "talking">("idle");
+  const [status, setStatus] = useState<"idle" | "listening" | "thinking" | "talking">("idle"); // ← ADDED "thinking"
   const [chat, setChat] = useState<{ role: string; text: string }[]>([]);
+  const [userInput, setUserInput] = useState<string>(""); // ← ADDED to store user's speech
   
   const talkOpacity = useRef(new Animated.Value(0)).current;
   const micScale = useRef(new Animated.Value(1)).current;
   const scrollRef = useRef<ScrollView>(null);
 
-  // --- 2. DUAL-PLAYER ENGINE ---
-  
   const idlePlayer = useVideoPlayer(activeAssets.idle, (p) => {
     p.loop = true;
     p.muted = true; 
     p.play();
   });
 
-  // Start with talking video, but it will be hidden (opacity 0)
   const talkPlayer = useVideoPlayer(activeAssets.talking, (p) => {
     p.loop = false;
-    p.muted = false;
+    p.muted = true; // ← MUTED — voice comes from TTS later
   });
 
-  // --- 3. ASYNC TRANSITION LOGIC ---
   useEffect(() => {
     const manageTransition = async () => {
       if (status === "talking") {
-        // Use replaceAsync to satisfy iOS/Modern Expo Video requirements
         await talkPlayer.replaceAsync(activeAssets.talking);
         talkPlayer.currentTime = 0; 
         talkPlayer.play();
-        
-        Animated.timing(talkOpacity, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }).start();
+        Animated.timing(talkOpacity, { toValue: 1, duration: 300, useNativeDriver: true }).start();
       } else {
-        Animated.timing(talkOpacity, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }).start(() => {
+        Animated.timing(talkOpacity, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => {
           talkPlayer.pause();
         });
       }
     };
-
     manageTransition();
   }, [status, activeAssets.talking]);
 
-  // Listener to return to idle
   useEffect(() => {
     const sub = talkPlayer.addListener('playToEnd', () => {
       setStatus("idle");
@@ -102,20 +85,36 @@ export default function SessionScreen({ navigation, route }: any) {
     return () => sub.remove();
   }, [talkPlayer]);
 
-  // --- 4. HANDLERS ---
+  // --- HANDLERS WITH GEMINI ---
   const handlePressIn = () => {
     setStatus("listening");
     Animated.spring(micScale, { toValue: 1.3, useNativeDriver: true }).start();
   };
 
-  const handlePressOut = () => {
+  const handlePressOut = async () => {
     Animated.spring(micScale, { toValue: 1, useNativeDriver: true }).start();
-    setChat(prev => [...prev, { role: "user", text: "Salam Zara!" }]);
     
-    setTimeout(() => {
-      setChat(prev => [...prev, { role: "ai", text: "Walaikum Assalam! How are you?" }]);
-      setStatus("talking");
-    }, 1500);
+    // TODO: Replace with actual voice recording
+    const mockUserText = "I love biryani from Burns Road!";
+    setUserInput(mockUserText);
+    
+    // Add user message to chat
+    setChat(prev => [...prev, { role: "user", text: mockUserText }]);
+    
+    // Start thinking
+    setStatus("thinking");
+    
+    // Get Gemini response
+    const aiResponse = await getCharacterResponse(mockUserText, charId, childName);
+    console.log("🔵 Gemini response:", aiResponse);
+    
+    // Add AI response to chat
+    setChat(prev => [...prev, { role: "ai", text: aiResponse }]);
+    
+    // Start talking animation
+    setStatus("talking");
+    
+    // TODO: Add Text-to-Speech here
   };
 
   return (
@@ -166,6 +165,15 @@ export default function SessionScreen({ navigation, route }: any) {
               </BlurView>
             </View>
           ))}
+          
+          {/* Thinking indicator */}
+          {status === "thinking" && (
+            <View style={styles.aiMsg}>
+              <BlurView intensity={30} tint="dark" style={styles.bubble}>
+                <Text style={styles.msgText}>🤔 Thinking...</Text>
+              </BlurView>
+            </View>
+          )}
         </ScrollView>
 
         <View style={styles.footer}>
@@ -173,14 +181,16 @@ export default function SessionScreen({ navigation, route }: any) {
             <TouchableOpacity
               onPressIn={handlePressIn}
               onPressOut={handlePressOut}
-              disabled={status === "talking"}
+              disabled={status === "talking" || status === "thinking"}
               style={[styles.micBtn, { backgroundColor: status === "listening" ? "#FF3B30" : themeColor }]}
             >
               <Ionicons name={status === "listening" ? "mic-outline" : "mic"} size={40} color="white" />
             </TouchableOpacity>
           </Animated.View>
           <Text style={styles.statusLabel}>
-            {status === "listening" ? "I am listening..." : "Hold to Talk"}
+            {status === "listening" ? "I am listening..." : 
+             status === "thinking" ? "Zara is thinking..." : 
+             status === "talking" ? "Zara is speaking..." : "Hold to Talk"}
           </Text>
         </View>
       </SafeAreaView>

@@ -52,7 +52,7 @@ const CHARACTERS = [
 ];
 
 export default function CharacterSelectScreen({ navigation, route }: any) {
-  const { name = "Buddy", ageGroup } = route.params || {};
+  const { name: childName = "Buddy", ageGroup } = route.params || { name: "Buddy", ageGroup: "10-14" };
   const [index, setIndex] = useState(0);
 
   // Animation Refs
@@ -135,7 +135,7 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
         </TouchableOpacity>
         {/* Header Section */}
         <View style={styles.header}>
-          <Text style={styles.greeting}>Hey {name}! 👋</Text>
+          <Text style={styles.greeting}>Hey {childName}! 👋</Text>
           <Text style={styles.title}>Who's your speaking buddy?</Text>
         </View>
 
@@ -242,7 +242,7 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
             ]}
             onPress={() =>
               navigation.navigate("Session", {
-                name,
+                name: childName,
                 ageGroup,
                 character: current,
               })
