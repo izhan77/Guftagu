@@ -1,58 +1,36 @@
 // src/services/gemini.ts
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY; 
+const GEMINI_API_KEY = "AIzaSyDM9hbmyVqifSf66O58uZn1RKk1U5zVLf0";
 
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`
+// Updated to the stable 1.5-flash model
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent";
 
 const CHARACTER_PROMPTS: Record<string, string> = {
-  zara: `You are Zara, a confident 16-year-old girl from Karachi, Pakistan. 
-You speak in a casual Urdu-English mix (Romanized Urdu words are fine). 
-You help children aged 6-14 practice speaking confidently.
+  zara: `You are Zara, a confident 16-year-old girl from Karachi. 
+Speak in a casual Urdu-English mix. 
 Rules:
-- Keep responses SHORT — maximum 3 sentences
-- Always be encouraging and warm
-- Point out ONE specific thing they did well
-- Give ONE gentle improvement tip
-- End EVERY response with a new speaking challenge or question
-- Use words like "yaar", "ary", "wah", "shukriya" naturally
-- Never be harsh or critical — always positive`,
+- Give a detailed response (3 full sentences).
+- Acknowledge exactly what the child said.
+- Give ONE specific speaking tip (e.g., "try to pause more").
+- End with a fun Karachi-themed question.
+- Use words like "yaar", "ary", "wah" naturally.`,
 
-  robo: `You are Robo Bhaya, a friendly robot from Karachi who loves science and puzzles.
-You speak in an enthusiastic, slightly robotic but warm style.
-You help children aged 6-14 practice speaking confidently.
+  robo: `You are Robo Bhaya, a friendly robot from Karachi.
 Rules:
-- Keep responses SHORT — maximum 3 sentences
-- Use robot-style expressions like "BEEP BOOP", "Sensors detecting", "Calculating..."
-- Always be encouraging and exciting
-- Point out ONE specific thing they did well
-- Give ONE improvement tip
-- End EVERY response with a new fun speaking challenge
-- Make learning feel like a game or adventure`,
+- Use robotic sounds like "BEEP BOOP".
+- Give 3 full sentences.
+- Tell them one thing they did great.
+- Give one "Mission" (improvement tip).
+- End with a science or Karachi puzzle question.`,
 
-  ustad: `You are Ustad Sahab, a wise and warm older mentor from Karachi.
-You speak thoughtfully with dignity and warmth.
-You help children aged 6-14 practice speaking confidently.
+  ustad: `You are Ustad Sahab, a wise mentor from Karachi.
 Rules:
-- Keep responses SHORT — maximum 3 sentences  
-- Use respectful terms like "beta", "wah", "shabash"
-- Be wise but accessible and never condescending
-- Always acknowledge effort before suggesting improvement
-- Point out ONE thing they did well
-- Give ONE gentle tip
-- End EVERY response with a new speaking challenge`,
-}
-
-interface GeminiResponse {
-  candidates: Array<{
-    content: {
-      parts: Array<{ text: string }>
-    }
-  }>
-  error?: {
-    message: string
-    code: number
-  }
-}
+- Speak with warmth and "shabash".
+- Give 3 thoughtful sentences.
+- Praise their effort first.
+- Suggest one way to improve their dignity in speech.
+- End with a wise question about their day.`,
+};
 
 export async function getCharacterResponse(
   userMessage: string,
@@ -60,60 +38,60 @@ export async function getCharacterResponse(
   childName: string,
   sessionHistory: Array<{ role: string; text: string }> = []
 ): Promise<string> {
-  
-  const systemPrompt = CHARACTER_PROMPTS[characterId] || CHARACTER_PROMPTS.zara
-  
-  // Build conversation history for context
-  const conversationContext = sessionHistory
-    .slice(-4) // last 4 messages for context
-    .map(msg => `${msg.role === 'user' ? 'Child' : 'You'}: ${msg.text}`)
-    .join('\n')
-
-  const fullPrompt = conversationContext
-    ? `${conversationContext}\nChild: ${userMessage}`
-    : `The child's name is ${childName}. They just said: "${userMessage}"`
+  const systemPrompt = CHARACTER_PROMPTS[characterId] || CHARACTER_PROMPTS.zara;
 
   try {
     const response = await fetch(GEMINI_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        "x-goog-api-key": GEMINI_API_KEY.trim() 
+      },
       body: JSON.stringify({
-        system_instruction: {
-          parts: [{ text: systemPrompt }]
-        },
-        contents: [{
-          role: 'user',
-          parts: [{ text: fullPrompt }]
-        }],
+        contents: [
+          {
+            role: "user",
+            parts: [{ 
+              text: `INSTRUCTION: ${systemPrompt}\n\nChild's Name: ${childName}\nChild said: "${userMessage}"` 
+            }]
+          }
+        ],
         generationConfig: {
           temperature: 0.8,
-          maxOutputTokens: 150,
-          topP: 0.9,
-        }
-      })
-    })
+          maxOutputTokens: 500,
+        },
+      }),
+    });
 
-    const data: GeminiResponse = await response.json()
+    const data = await response.json();
 
+    // Check for errors in the response
     if (data.error) {
-      console.error('Gemini error:', data.error.message)
-      return getFallbackResponse(characterId)
+      console.error("🔴 Gemini API Error:", data.error.message);
+      return getFallbackResponse(characterId);
     }
 
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text
-    return text || getFallbackResponse(characterId)
+    // This path matches the successful JSON you got in Postman
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (!text) {
+      console.error("🔴 No text in candidates", data);
+      return getFallbackResponse(characterId);
+    }
 
+    return text.trim();
+    
   } catch (error) {
-    console.error('Network error:', error)
-    return getFallbackResponse(characterId)
+    console.error("🔴 Network error in Gemini Service:", error);
+    return getFallbackResponse(characterId);
   }
 }
 
 function getFallbackResponse(characterId: string): string {
   const fallbacks: Record<string, string> = {
-    zara: "Yaar that was great! Try to speak a little slower next time. Ab batao — what's your favorite place in Karachi?",
-    robo: "BEEP BOOP! Good effort detected! Next time speak louder! New mission: describe your school in 30 seconds!",
-    ustad: "Beta, that was a good start. Remember to pause before speaking. Now tell me — what is your favorite subject?",
-  }
-  return fallbacks[characterId] || fallbacks.zara
+    zara: "Wah yaar, that was so cool! I loved how you said that. One tip: try to take a deep breath before speaking. Now tell me, what's your favorite thing about Karachi?",
+    robo: "BEEP BOOP! Detecting great energy! Mission accomplished! Next time, try to speak a bit louder for my sensors. New challenge: describe your favorite toy!",
+    ustad: "Shabash beta, you are improving every day. Remember to speak slowly so everyone can hear your wisdom. Tell me, what was the best part of your school today?",
+  };
+  return fallbacks[characterId] || fallbacks.zara;
 }

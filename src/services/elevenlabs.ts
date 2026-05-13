@@ -1,22 +1,53 @@
-// const ELEVEN_LABS_API_KEY = "YOUR_KEY";
+// src/services/elevenlabs.ts
+const ELEVEN_LABS_API_KEY = "sk_3b39cef49efbc632223a1c24340131c4db1f2a1b255e3748";
 
-// export async function getElevenLabsAudio(text: string, characterId: string) {
-//   const voices = { zara: "EXAVITQu4vr4xnSDxMaL", robo: "ErXwbcqjndXLjDdejnGu", ustad: "N2lVS1wzXK9XALp7u9qY" };
+const VOICE_IDS: Record<string, string> = {
+  zara: "JBFqnCBsd6RMkjVDRZzb", 
+  robo: "JBFqnCBsd6RMkjVDRZzb", 
+  ustad: "JBFqnCBsd6RMkjVDRZzb"
+};
 
-//   const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voices[characterId]}`, {
-//     method: 'POST',
-//     headers: { 'Content-Type': 'application/json', 'xi-api-key': ELEVEN_LABS_API_KEY },
-//     body: JSON.stringify({
-//       text,
-//       model_id: "eleven_multilingual_v2", // Best for Urdu/English
-//       voice_settings: { stability: 0.5, similarity_boost: 0.8 }
-//     })
-//   });
+export async function getCharacterAudio(text: string, characterId: string): Promise<string> {
+  const voiceId = VOICE_IDS[characterId] || VOICE_IDS.zara;
+  
+  try {
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'xi-api-key': ELEVEN_LABS_API_KEY.trim(),
+      },
+      body: JSON.stringify({
+        text: text,
+        model_id: "eleven_multilingual_v2",
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.75,
+        }
+      }),
+    });
 
-//   const blob = await response.blob();
-//   return new Promise((resolve) => {
-//     const reader = new FileReader();
-//     reader.onloadend = () => resolve(reader.result);
-//     reader.readAsDataURL(blob);
-//   });
-// }
+    if (!response.ok) {
+      const errorData = await response.json();
+      // THIS WILL PRINT THE EXACT PROBLEM IN YOUR TERMINAL
+      console.error("🔴 ElevenLabs Error Detail:", JSON.stringify(errorData));
+      throw new Error(`ElevenLabs API error: ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    
+    // Convert blob to Base64
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64data = reader.result as string;
+        resolve(base64data);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error("TTS Error:", error);
+    return "";
+  }
+}
