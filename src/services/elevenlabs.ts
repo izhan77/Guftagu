@@ -1,5 +1,5 @@
 // src/services/elevenlabs.ts
-const ELEVEN_LABS_API_KEY = "sk_3b39cef49efbc632223a1c24340131c4db1f2a1b255e3748";
+const ELEVEN_LABS_API_KEY = process.env.ELEVEN_LABS_API_KEY;
 
 const VOICE_IDS: Record<string, string> = {
   zara: "JBFqnCBsd6RMkjVDRZzb", 

@@ -1,6 +1,6 @@
 // src/services/gemini.ts
 
-const GEMINI_API_KEY = "AIzaSyBCDdM6TX3Mfq2jqSQ3xbv-mojjQgV2yyM";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 // Updated to the stable 1.5-flash model
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
