@@ -16,7 +16,8 @@ import { BlurView } from "expo-blur";
 import { Audio } from "expo-av";
 import { useFirestoreSync } from "../../hooks/useFirestoreSync";
 
-import { getCharacterResponse } from "../../services/gemini";
+// import { getCharacterResponse } from "../../services/gemini";
+import { getCharacterResponse } from "../../services/openai";
 import { getCharacterAudio } from "../../services/elevenlabs";
 import { transcribeAudio } from "../../services/whisper";
 
