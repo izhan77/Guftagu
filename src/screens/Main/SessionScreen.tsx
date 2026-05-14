@@ -8,8 +8,6 @@ import {
   Animated,
   SafeAreaView,
   ScrollView,
-  ViewStyle,
-  TextStyle,
 } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { LinearGradient } from "expo-linear-gradient";
@@ -17,13 +15,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { Audio } from "expo-av";
 
-// Import your services
 import { getCharacterResponse } from "../../services/gemini";
 import { getCharacterAudio } from "../../services/elevenlabs";
+import { transcribeAudio } from "../../services/whisper";
 
 const { width, height } = Dimensions.get("window");
 
-// --- ASSET MAPPING ---
 const CHAR_ASSETS: Record<string, { idle: any; talking: any }> = {
   zara: {
     idle: require("../../../assets/videos/zara/zara_idle.mp4"),
@@ -42,38 +39,63 @@ const CHAR_ASSETS: Record<string, { idle: any; talking: any }> = {
 export default function SessionScreen({ navigation, route }: any) {
   const { character, childName } = route.params || {};
   const charId =
-    character?.id && character.id in CHAR_ASSETS ? character.id : "zara";
+    character?.id && CHAR_ASSETS[character.id] ? character.id : "zara";
   const themeColor = character?.buttonColor || "#FF9500";
   const activeAssets = CHAR_ASSETS[charId];
 
-  // --- STATE ---
   const [status, setStatus] = useState<
     "idle" | "listening" | "thinking" | "talking"
   >("idle");
   const [chat, setChat] = useState<{ role: string; text: string }[]>([]);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [openingShown, setOpeningShown] = useState(false);
 
   const talkOpacity = useRef(new Animated.Value(0)).current;
   const micScale = useRef(new Animated.Value(1)).current;
   const scrollRef = useRef<ScrollView>(null);
 
-  // --- VIDEO PLAYERS ---
+  // Video players with error handling
   const idlePlayer = useVideoPlayer(activeAssets.idle, (p) => {
     p.loop = true;
     p.muted = true;
-    p.play();
+    try {
+      p.play();
+    } catch (e) {
+      console.log("Idle player error:", e);
+    }
   });
 
   const talkPlayer = useVideoPlayer(activeAssets.talking, (p) => {
-    p.loop = true; // Loop the generic "talking" video
+    p.loop = true;
     p.muted = true;
   });
 
-  // --- EFFECTS ---
-  // Manage Video Transitions (Cross-fade)
+  // Safe pause/play functions
+  const safePauseTalkPlayer = () => {
+    try {
+      if (talkPlayer) {
+        talkPlayer.pause();
+      }
+    } catch (e) {
+      console.log("Pause error (ignored):", e);
+    }
+  };
+
+  const safePlayTalkPlayer = () => {
+    try {
+      if (talkPlayer) {
+        talkPlayer.play();
+      }
+    } catch (e) {
+      console.log("Play error (ignored):", e);
+    }
+  };
+
+  // Video transition with error handling
   useEffect(() => {
     if (status === "talking") {
-      talkPlayer.play();
+      safePlayTalkPlayer();
       Animated.timing(talkOpacity, {
         toValue: 1,
         duration: 400,
@@ -85,34 +107,97 @@ export default function SessionScreen({ navigation, route }: any) {
         duration: 400,
         useNativeDriver: true,
       }).start(() => {
-        talkPlayer.pause();
+        safePauseTalkPlayer();
       });
     }
   }, [status]);
 
-  // Cleanup sound
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (sound) sound.unloadAsync();
+      if (sound) {
+        try {
+          sound.unloadAsync();
+        } catch (e) {}
+      }
+      if (recording) {
+        try {
+          recording.stopAndUnloadAsync();
+        } catch (e) {}
+      }
     };
-  }, [sound]);
+  }, [sound, recording]);
 
-  // --- CORE LOGIC ---
-  const handlePressIn = () => {
-    setStatus("listening");
-    Animated.spring(micScale, { toValue: 1.3, useNativeDriver: true }).start();
+  // Opening message
+  useEffect(() => {
+    if (!openingShown) {
+      const openings: Record<string, string> = {
+        zara: `Yaar ${childName}! Finally you're here! Main kaab se wait kar rahi thi. Bolo — kya chal raha hai life mein? 😄`,
+        robo: `BEEP BOOP! Hello ${childName}! I am Robo Bhaya. Ready for an EPIC conversation? 🤖`,
+        ustad: `Aaao beta, baithao. ${childName} — bahut pyaara naam hai. Tum ready ho? ☕`,
+      };
+
+      const opening = openings[charId] || openings.zara;
+
+      setTimeout(() => {
+        setChat([{ role: "ai", text: opening }]);
+        setOpeningShown(true);
+      }, 500);
+    }
+  }, []);
+
+  const handlePressIn = async () => {
+    try {
+      if (recording) {
+        try {
+          await recording.stopAndUnloadAsync();
+        } catch (e) {}
+        setRecording(null);
+      }
+
+      const { status: permissionStatus } =
+        await Audio.requestPermissionsAsync();
+      if (permissionStatus !== "granted") return;
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const { recording: newRecording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY,
+      );
+
+      setRecording(newRecording);
+      setStatus("listening");
+      Animated.spring(micScale, {
+        toValue: 1.3,
+        useNativeDriver: true,
+      }).start();
+    } catch (err) {
+      console.error("Recording Start Error:", err);
+      setStatus("idle");
+    }
   };
 
   const handlePressOut = async () => {
-    Animated.spring(micScale, { toValue: 1, useNativeDriver: true }).start();
+    if (!recording) return;
 
-    // 1. Mock user speech (Replace with real STT later)
-    const userSpeech = "I like biryani from Burns Road!";
-    setChat((prev) => [...prev, { role: "user", text: userSpeech }]);
+    Animated.spring(micScale, { toValue: 1, useNativeDriver: true }).start();
     setStatus("thinking");
 
     try {
-      // 2. Get Brain Response (Gemini)
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      setRecording(null);
+
+      if (!uri) throw new Error("No recording URI");
+
+      const userSpeech = await transcribeAudio(uri);
+      if (!userSpeech) throw new Error("No transcription");
+
+      setChat((prev) => [...prev, { role: "user", text: userSpeech }]);
+
       const aiText = await getCharacterResponse(
         userSpeech,
         charId,
@@ -120,25 +205,20 @@ export default function SessionScreen({ navigation, route }: any) {
         chat,
       );
       setChat((prev) => [...prev, { role: "ai", text: aiText }]);
-      setChat((prev) => [...prev, { role: "ai", text: aiText }]);
 
-      // 3. Get Voice (ElevenLabs)
       const base64Audio = await getCharacterAudio(aiText, charId);
 
       if (base64Audio) {
-        // 4. Prepare and Play Audio
         const { sound: newSound } = await Audio.Sound.createAsync(
           { uri: base64Audio },
           { shouldPlay: true },
         );
         setSound(newSound);
-
-        // 5. Start Lip Sync Video
         setStatus("talking");
 
         newSound.setOnPlaybackStatusUpdate((playbackStatus) => {
           if (playbackStatus.isLoaded && playbackStatus.didJustFinish) {
-            setStatus("idle"); // Audio done -> Return to idle blinking
+            setStatus("idle");
             newSound.unloadAsync();
           }
         });
@@ -153,7 +233,7 @@ export default function SessionScreen({ navigation, route }: any) {
 
   return (
     <View style={styles.container}>
-      {/* LAYER 1: IDLE (Always running) */}
+      {/* LAYER 1: IDLE */}
       <View style={StyleSheet.absoluteFill}>
         <VideoView
           player={idlePlayer}
@@ -163,7 +243,7 @@ export default function SessionScreen({ navigation, route }: any) {
         />
       </View>
 
-      {/* LAYER 2: TALKING (Fades in over idle) */}
+      {/* LAYER 2: TALKING */}
       <Animated.View
         style={[StyleSheet.absoluteFill, { opacity: talkOpacity }]}
       >
@@ -245,9 +325,9 @@ export default function SessionScreen({ navigation, route }: any) {
             {status === "listening"
               ? "I'm listening..."
               : status === "thinking"
-                ? `${character?.name} is thinking...`
+                ? "Thinking..."
                 : status === "talking"
-                  ? `${character?.name} is speaking...`
+                  ? "Speaking..."
                   : "Hold to Talk"}
           </Text>
         </View>
@@ -265,12 +345,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     padding: 20,
+    marginTop: 20,
   },
   backBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "#7C5CBF",
     justifyContent: "center",
     alignItems: "center",
   },
