@@ -1,4 +1,5 @@
-import React, { useState, useRef } from "react";
+// src/screens/Main/CharacterSelectScreen.tsx
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,6 +13,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useFirestoreSync } from "../../hooks/useFirestoreSync";
 
 const { width, height } = Dimensions.get("window");
 
@@ -52,8 +54,16 @@ const CHARACTERS = [
 ];
 
 export default function CharacterSelectScreen({ navigation, route }: any) {
-  const { name: childName = "Buddy", ageGroup } = route.params || { name: "Buddy", ageGroup: "10-14" };
+  const { 
+    name: childName = "Buddy", 
+    ageGroup = "10-14",
+    fromOnboarding = false  // ← NEW: track if coming from onboarding
+  } = route.params || {};
+  
   const [index, setIndex] = useState(0);
+
+  // Add Firestore listener to detect if data was deleted
+  useFirestoreSync(navigation);
 
   // Animation Refs
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -62,8 +72,8 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
 
   const current = CHARACTERS[index];
 
-  // Continuous Floating Animation (The Figma Magic)
-  React.useEffect(() => {
+  // Continuous Floating Animation
+  useEffect(() => {
     Animated.loop(
       Animated.sequence([
         Animated.timing(floatAnim, {
@@ -117,7 +127,7 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
 
   const translateY = floatAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, -15], // Moves up 15 pixels
+    outputRange: [0, -15],
   });
 
   return (
@@ -126,20 +136,24 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
       style={styles.container}
     >
       <SafeAreaView style={styles.safe}>
-        <TouchableOpacity
-          style={styles.backBtnContainer}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
+        {/* ✅ Show back button ONLY when coming from onboarding */}
+        {fromOnboarding && (
+          <TouchableOpacity
+            style={styles.backBtnContainer}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        )}
+        
         {/* Header Section */}
         <View style={styles.header}>
           <Text style={styles.greeting}>Hey {childName}! 👋</Text>
           <Text style={styles.title}>Who's your speaking buddy?</Text>
         </View>
 
-        {/* Character Stage (The 3D Experience) */}
+        {/* Character Stage */}
         <View style={styles.characterStage}>
           <View style={styles.watermarkWrapper} pointerEvents="none">
             <Animated.Text style={[styles.watermark, { opacity: fadeAnim }]}>
@@ -242,8 +256,8 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
             ]}
             onPress={() =>
               navigation.navigate("Session", {
-                name: childName,
-                ageGroup,
+                childName: childName,
+                ageGroup: ageGroup,
                 character: current,
               })
             }
@@ -274,7 +288,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   safe: { flex: 1, paddingHorizontal: 20 },
-  header: { alignItems: "center", marginTop: 10, zIndex: 10 },
+  header: { alignItems: "center", marginTop: 30, zIndex: 10 },
   greeting: { fontSize: 26, fontFamily: "Poppins-ExtraBold", color: "#000000" },
   title: {
     fontSize: 16,
@@ -302,7 +316,6 @@ const styles = StyleSheet.create({
     color: "rgba(0,0,0,0.1)",
     textAlign: "center",
   },
-
   stageContent: {
     flexDirection: "row",
     alignItems: "center",
@@ -320,7 +333,6 @@ const styles = StyleSheet.create({
     elevation: 4,
     shadowOpacity: 0.1,
   },
-
   imageContainer: {
     width: width * 0.6,
     height: height * 0.35,
@@ -338,7 +350,6 @@ const styles = StyleSheet.create({
     width: "120%",
     height: "100%",
   },
-
   bottomMask: {
     position: "absolute",
     bottom: -2,
@@ -347,7 +358,6 @@ const styles = StyleSheet.create({
     zIndex: 4,
     borderRadius: 60,
   },
-
   infoCard: {
     backgroundColor: "white",
     borderRadius: 30,

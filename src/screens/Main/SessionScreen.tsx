@@ -14,6 +14,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { Audio } from "expo-av";
+import { useFirestoreSync } from '../../hooks/useFirestoreSync';
 
 import { getCharacterResponse } from "../../services/gemini";
 import { getCharacterAudio } from "../../services/elevenlabs";
@@ -50,6 +51,8 @@ export default function SessionScreen({ navigation, route }: any) {
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [openingShown, setOpeningShown] = useState(false);
+
+  useFirestoreSync(navigation);
 
   const talkOpacity = useRef(new Animated.Value(0)).current;
   const micScale = useRef(new Animated.Value(1)).current;

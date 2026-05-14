@@ -25,9 +25,11 @@ export default function NameInputScreen({ navigation, route }: any) {
     setIsLoading(true);
     try {
       await saveChildProfile(name.trim());
+      // ✅ Pass fromOnboarding = true so back button shows
       navigation.navigate("CharacterSelect", {
         name: name.trim(),
         ageGroup,
+        fromOnboarding: true,  // ← ADD THIS
       });
     } catch (error) {
       console.error('Error saving nickname:', error);
@@ -40,7 +42,6 @@ export default function NameInputScreen({ navigation, route }: any) {
   return (
     <LinearGradient colors={["#EEE6FF", "#FFFFFF"]} style={styles.container}>
       <SafeAreaView style={styles.safe}>
-        {/* Consistent Purple Back Button */}
         <TouchableOpacity
           style={styles.backBtnContainer}
           onPress={() => navigation.goBack()}
