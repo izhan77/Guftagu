@@ -1,3 +1,4 @@
+// src/screens/Onboarding/NameInputScreen.tsx
 import React, { useState } from "react";
 import {
   View,
@@ -5,14 +6,36 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { saveChildProfile } from "../../services/onboardingLogic";
 
 export default function NameInputScreen({ navigation, route }: any) {
   const [name, setName] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const { ageGroup } = route.params;
+
+  const handleContinue = async () => {
+    if (name.length <= 2) return;
+    
+    setIsLoading(true);
+    try {
+      await saveChildProfile(name.trim());
+      navigation.navigate("CharacterSelect", {
+        name: name.trim(),
+        ageGroup,
+      });
+    } catch (error) {
+      console.error('Error saving nickname:', error);
+      Alert.alert("Error", "Could not save your nickname. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <LinearGradient colors={["#EEE6FF", "#FFFFFF"]} style={styles.container}>
@@ -22,6 +45,7 @@ export default function NameInputScreen({ navigation, route }: any) {
           style={styles.backBtnContainer}
           onPress={() => navigation.goBack()}
           activeOpacity={0.7}
+          disabled={isLoading}
         >
           <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
@@ -39,22 +63,22 @@ export default function NameInputScreen({ navigation, route }: any) {
             value={name}
             onChangeText={setName}
             autoFocus
+            editable={!isLoading}
           />
 
           <TouchableOpacity
             style={[
               styles.button,
-              { backgroundColor: name.length > 2 ? "#7C5CBF" : "#D1D1D1" },
+              { backgroundColor: name.length > 2 && !isLoading ? "#7C5CBF" : "#D1D1D1" },
             ]}
-            onPress={() =>
-              navigation.navigate("CharacterSelect", {
-                name,
-                ageGroup,
-              })
-            }
-            disabled={name.length <= 2}
+            onPress={handleContinue}
+            disabled={name.length <= 2 || isLoading}
           >
-            <Text style={styles.buttonText}>Start My Journey</Text>
+            {isLoading ? (
+              <ActivityIndicator color="#FFF" />
+            ) : (
+              <Text style={styles.buttonText}>Start My Journey</Text>
+            )}
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -74,7 +98,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 40,
     marginLeft: 24,
-    // Matching shadow
     shadowColor: "#7C5CBF",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,

@@ -1,35 +1,33 @@
 // src/hooks/useOnboardingStatus.ts
-import { useState, useEffect } from 'react'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import { useState, useEffect } from 'react';
+import { getUserSession, isSessionFullyOnboarded, UserSession } from '../services/asyncStorage';
 
 export function useOnboardingStatus() {
-  const [isLoading, setIsLoading] = useState(true)
-  const [isOnboarded, setIsOnboarded] = useState(false)
-  const [userData, setUserData] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true);
+  const [isOnboarded, setIsOnboarded] = useState(false);
+  const [userData, setUserData] = useState<UserSession | null>(null);
 
   useEffect(() => {
-    checkOnboarding()
-  }, [])
+    checkStatus();
+  }, []);
 
-  const checkOnboarding = async () => {
+  const checkStatus = async () => {
     try {
-      const data = await AsyncStorage.getItem('guftagu_user')
-      if (data) {
-        setIsOnboarded(true)
-        setUserData(JSON.parse(data))
-      }
-    } catch (e) {
-      console.log(e)
+      const session = await getUserSession();
+      const onboarded = isSessionFullyOnboarded(session);
+      setIsOnboarded(onboarded);
+      setUserData(session);
+    } catch (error) {
+      console.error('Error checking status:', error);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
-  const completeOnboarding = async (userData: any) => {
-    await AsyncStorage.setItem('guftagu_user', JSON.stringify(userData))
-    setIsOnboarded(true)
-    setUserData(userData)
-  }
+  const completeOnboarding = (data: UserSession) => {
+    setIsOnboarded(true);
+    setUserData(data);
+  };
 
-  return { isLoading, isOnboarded, userData, completeOnboarding }
+  return { isLoading, isOnboarded, userData, completeOnboarding };
 }
