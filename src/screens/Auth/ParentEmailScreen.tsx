@@ -10,11 +10,15 @@ import {
   KeyboardAvoidingView,
   Image,
   Platform,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import LoadingDots from "../../components/LoadingDots";
+
+// Import Firebase functions
+import { requestParentConsent, verifyParentAnswer } from "../../services/onboardingLogic";
 
 const { width } = Dimensions.get("window");
 
@@ -24,12 +28,15 @@ export default function ParentEmailScreen({ navigation, route }: any) {
   const [step, setStep] = useState<AuthStep>("EMAIL");
   const [email, setEmail] = useState("");
   const [answer, setAnswer] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
 
-  const { ageGroup } = route?.params || {};
+  //  Store consentId and mathQuestion from Firebase response
+  const [consentId, setConsentId] = useState<string>("");
+  const [mathQuestion, setMathQuestion] = useState<string>("14 + 26");
 
+  const { ageGroup } = route?.params || {};
   const slideAnim = useRef(new Animated.Value(0)).current;
-  const quiz = { question: "14 + 26", result: 40 };
 
   const transitionTo = (nextStep: AuthStep) => {
     Animated.timing(slideAnim, {
@@ -48,24 +55,59 @@ export default function ParentEmailScreen({ navigation, route }: any) {
     });
   };
 
-  const handleSendEmail = () => {
+  //  Now calls Firebase via requestParentConsent()
+  const handleSendEmail = async () => {
     if (!email.includes("@")) return;
+
+    setIsLoading(true);
     transitionTo("WAITING");
 
-    setTimeout(() => {
+    try {
+      const result = await requestParentConsent(email);
+
+      // Store the consentId and math question from Firebase
+      setConsentId(result.consentId);
+      setMathQuestion(result.mathQuestion);
+
+      console.log(" Consent request saved to Firestore:", result.consentId);
+
       transitionTo("QUIZ");
-    }, 3000);
+    } catch (error: any) {
+      console.error("Error requesting consent:", error);
+      Alert.alert(
+        "Error",
+        "Failed to send consent email. Please check your connection and try again.",
+        [{ text: "OK", onPress: () => transitionTo("EMAIL") }]
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const checkMath = () => {
-    if (parseInt(answer) === quiz.result) {
-      setIsFinishing(true);
+  // Now calls Firebase via verifyParentAnswer()
+  const checkMath = async () => {
+    if (!answer) return;
 
-      setTimeout(() => {
-        navigation.navigate("NameInput", { ageGroup });
-      }, 1500);
-    } else {
+    setIsFinishing(true);
+
+    try {
+      const verified = await verifyParentAnswer(consentId, answer);
+
+      if (verified) {
+        console.log(" Parent consent verified in Firestore");
+        setTimeout(() => {
+          navigation.navigate("NameInput", { ageGroup });
+        }, 1000);
+      } else {
+        Alert.alert("Wrong Answer", "That doesn't match. Please try again.");
+        setAnswer("");
+        setIsFinishing(false);
+      }
+    } catch (error) {
+      console.error(" Error verifying answer:", error);
+      Alert.alert("Error", "Verification failed. Please try again.");
       setAnswer("");
+      setIsFinishing(false);
     }
   };
 
@@ -76,7 +118,7 @@ export default function ParentEmailScreen({ navigation, route }: any) {
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={styles.inner}
         >
-          {/* Logo Section - CENTERED */}
+          {/* Logo */}
           <View style={styles.logoContainer}>
             <Image
               source={require("../../../assets/logo.png")}
@@ -107,10 +149,12 @@ export default function ParentEmailScreen({ navigation, route }: any) {
                   onChangeText={setEmail}
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  editable={!isLoading}
                 />
                 <TouchableOpacity
-                  style={styles.mainBtn}
+                  style={[styles.mainBtn, isLoading && { opacity: 0.6 }]}
                   onPress={handleSendEmail}
+                  disabled={isLoading}
                 >
                   <Text style={styles.btnText}>Continue</Text>
                   <Ionicons name="arrow-forward" size={20} color="#FFF" />
@@ -124,10 +168,10 @@ export default function ParentEmailScreen({ navigation, route }: any) {
                 <View style={styles.loaderWrapper}>
                   <LoadingDots color="#7C5CBF" />
                 </View>
-                <Text style={styles.title}>Verifying Email</Text>
+                <Text style={styles.title}>Sending Email</Text>
                 <Text style={styles.subtitle}>
-                  We've sent a link to {email}. We'll move forward once you tap
-                  it!
+                  Saving consent request and sending a math challenge to{" "}
+                  {email}...
                 </Text>
               </View>
             )}
@@ -144,7 +188,8 @@ export default function ParentEmailScreen({ navigation, route }: any) {
                 </Text>
 
                 <View style={styles.quizBox}>
-                  <Text style={styles.mathText}>{quiz.question} =</Text>
+                  {/* ✅ Uses real math question from Firebase */}
+                  <Text style={styles.mathText}>{mathQuestion} =</Text>
                   <TextInput
                     style={styles.mathInput}
                     placeholder="?"
@@ -152,8 +197,9 @@ export default function ParentEmailScreen({ navigation, route }: any) {
                     keyboardType="numeric"
                     value={answer}
                     onChangeText={setAnswer}
-                    maxLength={2}
+                    maxLength={3}
                     autoFocus
+                    editable={!isFinishing}
                   />
                 </View>
 
@@ -183,19 +229,13 @@ export default function ParentEmailScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   inner: { flex: 1, paddingHorizontal: 25, paddingTop: 20 },
-  
-  // Logo Container - Centers the logo
   logoContainer: {
     alignItems: "center",
     justifyContent: "center",
     marginTop: 20,
     marginBottom: 30,
   },
-  logo: {
-    width: 140,
-    height: 50,
-  },
-  
+  logo: { width: 140, height: 50 },
   cardContainer: { flex: 1, width: "100%" },
   stepContent: { width: "100%", alignItems: "center" },
   title: {

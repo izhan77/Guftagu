@@ -52,8 +52,25 @@ const CHARACTERS = [
 ];
 
 export default function CharacterSelectScreen({ navigation, route }: any) {
-  const { name: childName = "Buddy", ageGroup } = route.params || { name: "Buddy", ageGroup: "10-14" };
+  const {
+    name: childName = "Buddy",
+    ageGroup = "10-14",
+    coppaRequired,
+  } = route.params || {};
+
   const [index, setIndex] = useState(0);
+
+  const handleBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate("NameInput", {
+      ageGroup,
+      initialName: typeof childName === "string" ? childName : undefined,
+      ...(typeof coppaRequired === "boolean" ? { coppaRequired } : {}),
+    });
+  };
 
   // Animation Refs
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -128,8 +145,10 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
       <SafeAreaView style={styles.safe}>
         <TouchableOpacity
           style={styles.backBtnContainer}
-          onPress={() => navigation.goBack()}
+          onPress={handleBack}
           activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
           <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
@@ -266,12 +285,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#7C5CBF",
     justifyContent: "center",
     alignItems: "center",
+    alignSelf: "flex-start",
     marginTop: 25,
+    zIndex: 100,
+    elevation: 8,
     shadowColor: "#7C5CBF",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 5,
-    elevation: 5,
   },
   safe: { flex: 1, paddingHorizontal: 20 },
   header: { alignItems: "center", marginTop: 10, zIndex: 10 },

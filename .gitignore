@@ -1,43 +1,131 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# dependencies
+
+
 node_modules/
 
-# Expo
+
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.production.local
+.env.test.local
+
+
+serviceAccountKey.json
+serviceAccountKey.json.json
+serviceAccountKey.json.backup
+*-firebase-adminsdk-*.json
+google-services.json
+GoogleService-Info.plist
+.aws/
+
+
 .expo/
+.expo-shared/
 dist/
 web-build/
 expo-env.d.ts
 
-# Native
-.kotlin/
-*.orig.*
-*.jks
+
+/ios/
+/android/
+
+
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+**/xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+*.mobileprovision
+*.provisionprofile
+*.cer
+*.CER
 *.p8
 *.p12
-*.key
-*.mobileprovision
 
-# Metro
+
+.gradle/
+local.properties
+*.keystore
+*.jks
+
+
+.kotlin/
+*.orig
+*.orig.*
+
+
 .metro-health-check*
+.haste_cache/
+*.cache
 
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+*.log
+debug.log
+debug-*.log
+out/
 
-# macOS
-.DS_Store
-*.pem
 
-# local env files
-.env*.local
-.env
-*.env
+coverage/
+.nyc_output/
+*.lcov
+.jest_cache/
+.mocha_output/
 
-# typescript
+
 *.tsbuildinfo
+*.js.map
+*.d.ts.map
 
-# generated native folders
-/ios
-/android
+
+*.apk
+*.ipa
+*.app
+*.zip
+*.tar.gz
+*.exe
+
+
+.venv/
+venv/
+ENV/
+env/
+.python-version
+*.egg-info/
+*.pot
+*.mo
+
+
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.iml
+
+
+.DS_Store
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+*.swp
+*.swo
+*~
+Thumbs.db
+ehthumbs.db
+*.lnk
+
+
+*.tmp
+*.temp
+.tmp/
+temp/
+*.bak
+*.backup

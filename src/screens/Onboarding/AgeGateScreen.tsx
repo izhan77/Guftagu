@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity,
-  StyleSheet, Image, Dimensions
+  StyleSheet, Image, Dimensions,
+  Alert
 } from 'react-native';
+import { saveAgeConsent } from '../../services/onboardingLogic';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,15 +22,22 @@ const AGE_OPTIONS = [
 export default function AgeInputScreen({ navigation }: any) {
   const [selected, setSelected] = useState<string | null>(null);
 
-  const handleContinue = () => {
-    if (!selected) return;
-    const needsCoppa = selected !== '14+';
-    if (needsCoppa) {
+  const handleContinue = async () => {
+  if (!selected) return;
+
+  try {
+    const { needsParentConsent, age } = await saveAgeConsent(selected);
+
+    if (needsParentConsent) {
       navigation.navigate('ParentConsent', { ageGroup: selected });
     } else {
       navigation.navigate('NameInput', { ageGroup: selected, coppaRequired: false });
     }
-  };
+  } catch (error) {
+    console.error('Error saving age:', error);
+    Alert.alert('Error', 'Failed to save age. Please try again.');
+  }
+};
 
   return (
     <LinearGradient colors={['#EEE6FF', '#E8F4FD']} style={styles.container}>

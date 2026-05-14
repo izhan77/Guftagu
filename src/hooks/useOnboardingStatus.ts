@@ -1,35 +1,49 @@
 // src/hooks/useOnboardingStatus.ts
-import { useState, useEffect } from 'react'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+
+import { useState, useEffect } from 'react';
+import { checkUserOnboarding } from '../services/onboardingLogic';
+import {
+  getUserSession,
+  isSessionFullyOnboarded,
+  type UserSession,
+} from '../services/asyncStorage';
 
 export function useOnboardingStatus() {
-  const [isLoading, setIsLoading] = useState(true)
-  const [isOnboarded, setIsOnboarded] = useState(false)
-  const [userData, setUserData] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true);
+  const [route, setRoute] = useState<'dashboard' | 'age-gate' | null>(null);
+  const [userData, setUserData] = useState<UserSession | null>(null);
+  const [isOnboarded, setIsOnboarded] = useState(false);
 
   useEffect(() => {
-    checkOnboarding()
-  }, [])
+    const initializeApp = async () => {
+      try {
+        const routingDecision = await checkUserOnboarding();
+        const session = await getUserSession();
 
-  const checkOnboarding = async () => {
-    try {
-      const data = await AsyncStorage.getItem('guftagu_user')
-      if (data) {
-        setIsOnboarded(true)
-        setUserData(JSON.parse(data))
+        setRoute(routingDecision.route);
+        setUserData(session);
+        setIsOnboarded(isSessionFullyOnboarded(session));
+      } catch (error) {
+        console.error('Error initializing app:', error);
+        setRoute('age-gate');
+      } finally {
+        setIsLoading(false);
       }
-    } catch (e) {
-      console.log(e)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+    };
 
-  const completeOnboarding = async (userData: any) => {
-    await AsyncStorage.setItem('guftagu_user', JSON.stringify(userData))
-    setIsOnboarded(true)
-    setUserData(userData)
-  }
+    initializeApp();
+  }, []);
 
-  return { isLoading, isOnboarded, userData, completeOnboarding }
+  const completeOnboarding = async (data: any) => {
+    setIsOnboarded(true);
+    setUserData(data);
+  };
+
+  return {
+    isLoading,
+    isOnboarded,
+    userData,
+    route,
+    completeOnboarding,
+  };
 }

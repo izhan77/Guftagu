@@ -2,5 +2,11 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true
-  }
+  },
+  "exclude": [
+    "INTEGRATION_GUIDE.ts",
+    "COMPLETE_FIREBASE_LOGIC.ts",
+    "UPDATED_onboardingLogic.ts",
+    "src/services/index.ts"
+  ]
 }

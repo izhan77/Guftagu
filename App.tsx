@@ -4,7 +4,6 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { usePreloadAssets } from "./src/hooks/usePreloadAssets";
 
-// Screens
 import SplashScreen from "./src/screens/Onboarding/SplashScreen";
 import AgeInputScreen from "./src/screens/Onboarding/AgeGateScreen";
 import NameInputScreen from "./src/screens/Onboarding/NameInputScreen";
@@ -18,8 +17,6 @@ const Stack = createStackNavigator();
 export default function App() {
   const isReady = usePreloadAssets();
 
-  // If assets aren't ready, keep showing the splash or a blank view
-  // that matches the splash background color.
   if (!isReady) {
     return <View style={{ flex: 1, backgroundColor: "#FFFFFF" }} />;
   }
@@ -28,26 +25,17 @@ export default function App() {
     <NavigationContainer>
       <Stack.Navigator
         initialRouteName="Splash"
-        screenOptions={
-          {
-            headerShown: false,
-            animationEnabled: false,
-          } as any
-        }
+        screenOptions={{
+          headerShown: false,
+          animationEnabled: false,
+        } as any}
       >
         <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="AgeInput" component={AgeInputScreen} />
         <Stack.Screen name="ParentConsent" component={ParentConsentScreen} />
-        <Stack.Screen
-          name="ParentEmail"
-          component={ParentEmailScreen}
-          options={{ headerShown: false }}
-        />
+        <Stack.Screen name="ParentEmail" component={ParentEmailScreen} />
         <Stack.Screen name="NameInput" component={NameInputScreen} />
-        <Stack.Screen
-          name="CharacterSelect"
-          component={CharacterSelectScreen}
-        />
+        <Stack.Screen name="CharacterSelect" component={CharacterSelectScreen} />
         <Stack.Screen name="Session" component={SessionScreen} />
       </Stack.Navigator>
     </NavigationContainer>

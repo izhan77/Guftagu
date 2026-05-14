@@ -1,8 +1,12 @@
 // src/services/gemini.ts
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY; 
+const GEMINI_API_KEY =
+  process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY;
 
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`
+function geminiUrl(): string {
+  const key = GEMINI_API_KEY ?? "";
+  return `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
+}
 
 const CHARACTER_PROMPTS: Record<string, string> = {
   zara: `You are Zara, a confident 16-year-old girl from Karachi, Pakistan. 
@@ -74,7 +78,7 @@ export async function getCharacterResponse(
     : `The child's name is ${childName}. They just said: "${userMessage}"`
 
   try {
-    const response = await fetch(GEMINI_URL, {
+    const response = await fetch(geminiUrl(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
