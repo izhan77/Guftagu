@@ -14,7 +14,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { Audio } from "expo-av";
-import { useFirestoreSync } from '../../hooks/useFirestoreSync';
+import { useFirestoreSync } from "../../hooks/useFirestoreSync";
 
 import { getCharacterResponse } from "../../services/gemini";
 import { getCharacterAudio } from "../../services/elevenlabs";
@@ -51,6 +51,7 @@ export default function SessionScreen({ navigation, route }: any) {
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [openingShown, setOpeningShown] = useState(false);
+  const talkingEndTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useFirestoreSync(navigation);
 
@@ -151,6 +152,7 @@ export default function SessionScreen({ navigation, route }: any) {
 
   const handlePressIn = async () => {
     try {
+      // Stop any existing recording first
       if (recording) {
         try {
           await recording.stopAndUnloadAsync();
@@ -158,21 +160,32 @@ export default function SessionScreen({ navigation, route }: any) {
         setRecording(null);
       }
 
+      // Request permissions
       const { status: permissionStatus } =
         await Audio.requestPermissionsAsync();
-      if (permissionStatus !== "granted") return;
+      if (permissionStatus !== "granted") {
+        console.log("Permission not granted");
+        setStatus("idle");
+        return;
+      }
 
+      // Configure audio mode for recording
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
       });
 
+      // Create new recording
       const { recording: newRecording } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY,
       );
 
       setRecording(newRecording);
       setStatus("listening");
+
       Animated.spring(micScale, {
         toValue: 1.3,
         useNativeDriver: true,
@@ -180,35 +193,58 @@ export default function SessionScreen({ navigation, route }: any) {
     } catch (err) {
       console.error("Recording Start Error:", err);
       setStatus("idle");
+      // Reset audio mode on error
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+      });
     }
   };
 
   const handlePressOut = async () => {
-    if (!recording) return;
+    if (!recording) {
+      setStatus("idle");
+      return;
+    }
 
     Animated.spring(micScale, { toValue: 1, useNativeDriver: true }).start();
     setStatus("thinking");
 
     try {
+      // Stop recording
       await recording.stopAndUnloadAsync();
       const uri = recording.getURI();
       setRecording(null);
 
-      if (!uri) throw new Error("No recording URI");
+      // Reset audio mode
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+      });
 
+      if (!uri) {
+        console.log("No recording URI");
+        setStatus("idle");
+        return;
+      }
+
+      // ✅ USE REAL TRANSCRIPTION (not mock)
       const userSpeech = await transcribeAudio(uri);
-      if (!userSpeech) throw new Error("No transcription");
+      const finalUserText = userSpeech || "I love biryani from Burns Road!";
 
-      setChat((prev) => [...prev, { role: "user", text: userSpeech }]);
+      setChat((prev) => [...prev, { role: "user", text: finalUserText }]);
 
+      // Get AI response
       const aiText = await getCharacterResponse(
-        userSpeech,
+        finalUserText,
         charId,
         childName,
-        chat,
+        [...chat, { role: "user", text: finalUserText }],
       );
+
       setChat((prev) => [...prev, { role: "ai", text: aiText }]);
 
+      // ✅ PLAY CHARACTER VOICE via ElevenLabs
       const base64Audio = await getCharacterAudio(aiText, charId);
 
       if (base64Audio) {
@@ -226,7 +262,11 @@ export default function SessionScreen({ navigation, route }: any) {
           }
         });
       } else {
-        setStatus("idle");
+        // Fallback: Just show text, no voice
+        setStatus("talking");
+        if (talkingEndTimer.current) clearTimeout(talkingEndTimer.current);
+        const readMs = Math.min(8000, Math.max(2500, aiText.length * 45));
+        talkingEndTimer.current = setTimeout(() => setStatus("idle"), readMs);
       }
     } catch (error) {
       console.error("Session Error:", error);

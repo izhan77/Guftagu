@@ -2,8 +2,7 @@
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-// Updated to the stable 1.5-flash model
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key=${GEMINI_API_KEY}`;
 
 let lastCallTime = 0
 const MIN_CALL_INTERVAL = 3000 // 3 seconds between calls
@@ -104,7 +103,7 @@ export async function getCharacterResponse(
         ],
         generationConfig: {
           temperature: 0.8,
-          maxOutputTokens: 200, // Reduced for faster, kid-friendly responses
+          maxOutputTokens: 300, // Reduced for faster, kid-friendly responses
         },
       }),
     });
