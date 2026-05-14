@@ -3,18 +3,7 @@ import {
   signOut,
   User,
 } from 'firebase/auth';
-import {
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  collection,
-  query,
-  where,
-  getDocs,
-  Timestamp,
-  addDoc,
-} from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, addDoc, collection, Timestamp, deleteField, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../services/firebase/config';
 import {
   saveUserSession,
@@ -201,67 +190,58 @@ export const requestParentConsent = async (
   }
 };
 
-//SCREEN 3C: Verify parent answer
- 
-export const verifyParentAnswer = async (
-  consentId: string,
-  answer: string
-): Promise<boolean> => {
-  try {
-    // Ensure user is signed in
-    const user = await ensureAuthenticated();
+export const deleteParentEmailAfterVerification = async (consentId: string): Promise<void> => {
+  const user = await ensureAuthenticated();
+  
+  const userRef = doc(db, 'users', user.uid);
+  await updateDoc(userRef, {
+    parentEmail: deleteField(),  // DELETES the email
+    pendingParentEmail: deleteField(),  // DELETES pending email
+    consentId: deleteField(),  // Optional: delete reference too
+  });
+  
+  console.log('Parent email deleted from Firestore - COPPA compliant');
+};
 
-    // Fetch the consent document
-    const consentDocRef = doc(db, 'consents', consentId);
-    const consentDocSnap = await getDoc(consentDocRef);
-
-    if (!consentDocSnap.exists()) {
-      console.error(' Consent document not found:', consentId);
-      return false;
-    }
-
-    const consentData = consentDocSnap.data();
-
-    // Verify the answer
-    const submittedAnswer = parseInt(answer, 10);
-    const storedAnswer = consentData.mathAnswer;
-    const isCorrect = submittedAnswer === storedAnswer;
-
-    if (!isCorrect) {
-      console.log('Incorrect answer submitted');
-      return false;
-    }
-
-    //  Answer is correct — update Firestore
-    console.log('Correct answer! Updating parent consent status...');
-
-    // Update user document
-    const userDocRef = doc(db, 'users', user.uid);
-    await updateDoc(userDocRef, {
-      parentConsent: true,
-      parentEmail: consentData.parentEmail,
-      consentVerifiedAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
-    });
-
-    // Update consent document to mark as verified
-    await updateDoc(consentDocRef, {
-      status: 'verified',
-      verifiedAt: Timestamp.now(),
-    });
-
-    // Save to AsyncStorage
-    await saveUserSession({
-      parentConsent: true,
-      timestamp: getCurrentTimestamp(),
-    });
-
-    console.log('Parent consent verified');
-    return true;
-  } catch (error) {
-    console.error('Error verifying parent answer:', error);
-    return false;
-  }
+export const verifyParentAnswer = async (consentId: string, answer: string): Promise<boolean> => {
+  const user = await ensureAuthenticated();
+  
+  const consentRef = doc(db, 'consents', consentId);
+  const consentSnap = await getDoc(consentRef);
+  
+  if (!consentSnap.exists()) return false;
+  
+  const data = consentSnap.data();
+  const isCorrect = parseInt(answer, 10) === data.mathAnswer;
+  
+  if (!isCorrect) return false;
+  
+  // Update consent status
+  await updateDoc(consentRef, { status: 'verified', verifiedAt: Timestamp.now() });
+  
+  // Update user document
+  const userRef = doc(db, 'users', user.uid);
+  await updateDoc(userRef, {
+    parentConsent: true,
+    consentVerifiedAt: Timestamp.now(),
+  });
+  
+  // ✅ FIX THIS - Delete BOTH email fields
+  await updateDoc(userRef, {
+    pendingParentEmail: deleteField(),  // Delete this
+    // parentEmail: deleteField(),       // Also delete if exists
+    consentId: deleteField(),            // Also delete consentId reference
+  });
+  
+  // Delete sensitive data from consent document
+  await updateDoc(consentRef, {
+    parentEmail: deleteField(),
+    mathAnswer: deleteField(),
+  });
+  
+  await saveUserSession({ parentConsent: true });
+  
+  return true;
 };
 
 
@@ -360,4 +340,49 @@ export const saveSessionInteraction = async (
     console.error(' Error saving session interaction:', error);
     throw error;
   }
+};
+
+// Add to onboardingLogic.ts
+
+// Create parent account and link to child
+export const linkChildToParent = async (
+  parentEmail: string,
+  childUid: string
+): Promise<string> => {
+  // Check if parent already exists
+  const parentsRef = collection(db, 'parents');
+  const q = query(parentsRef, where('email', '==', parentEmail));
+  const querySnapshot = await getDocs(q);
+  
+  let parentId: string;
+  
+  if (!querySnapshot.empty) {
+    // Parent exists - add child to existing parent
+    const parentDoc = querySnapshot.docs[0];
+    parentId = parentDoc.id;
+    const existingChildren = parentDoc.data().linkedChildren || [];
+    await updateDoc(doc(db, 'parents', parentId), {
+      linkedChildren: [...existingChildren, childUid],
+      updatedAt: Timestamp.now()
+    });
+  } else {
+    // Create new parent account (no password yet - will be set later)
+    const newParentRef = await addDoc(collection(db, 'parents'), {
+      email: parentEmail,
+      linkedChildren: [childUid],
+      hasPassword: false,  // Parent hasn't set password yet
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    });
+    parentId = newParentRef.id;
+  }
+  
+  // Update child's document with parent link
+  const childRef = doc(db, 'users', childUid);
+  await updateDoc(childRef, {
+    linkedParentId: parentId,
+    // Keep email in parent collection only - NOT in child doc
+  });
+  
+  return parentId;
 };
