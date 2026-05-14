@@ -1,58 +1,112 @@
-// src/services/asyncStorage.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
+// ✅ uuid removed — was crashing Hermes (no crypto in React Native)
 
 export interface UserSession {
-  uid?: string;
+  email: string;
   anonId: string;
-  age?: number;
-  ageGroup?: string;
-  nickname?: string;
-  parentEmail?: string;
-  parentConsent?: boolean;
-  onboardingComplete?: boolean;
   timestamp: number;
+  consentGiven: boolean;
+  age?: number;
+  ageConsent?: boolean;
+  parentConsent?: boolean;
+  nickname?: string;
+  onboardingComplete?: boolean;
 }
 
 const SESSION_KEY = 'guftagu_user_session';
 
-export const saveUserSession = async (sessionData: Partial<UserSession>): Promise<void> => {
+/**
+ * Generate a unique anonymous ID — crypto-free, Hermes-safe
+ */
+export const generateAnonId = (): string => {
+  const timestamp = Date.now().toString(36);           // e.g. "lkq3f2a"
+  const r1 = Math.random().toString(36).substring(2, 9); // 7 random chars
+  const r2 = Math.random().toString(36).substring(2, 9); // 7 more
+  return `child_${timestamp}_${r1}_${r2}`;             // e.g. "child_lkq3f2a_4g8xz1p_9mw2k7r"
+};
+
+/**
+ * Save user session data to AsyncStorage
+ */
+export const saveUserSession = async (
+  sessionData: Partial<UserSession>
+): Promise<void> => {
   try {
-    const existing = await getUserSession();
-    const updated = { ...existing, ...sessionData, timestamp: Date.now() } as UserSession;
-    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(updated));
+    const existingSession = await getUserSession();
+    const updatedSession: UserSession = {
+      ...(existingSession ?? {}),
+      ...sessionData,
+      timestamp: sessionData.timestamp || Date.now(),
+    } as UserSession;
+    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(updatedSession));
   } catch (error) {
-    console.error('Error saving session:', error);
+    console.error('Error saving user session:', error);
+    throw error;
   }
 };
 
+/**
+ * Retrieve user session from AsyncStorage
+ */
 export const getUserSession = async (): Promise<UserSession | null> => {
   try {
     const session = await AsyncStorage.getItem(SESSION_KEY);
     return session ? JSON.parse(session) : null;
   } catch (error) {
-    console.error('Error getting session:', error);
+    console.error('Error retrieving user session:', error);
     return null;
   }
 };
 
+/** True only when local session reflects a finished onboarding (not a partial write). */
+export const isSessionFullyOnboarded = (
+  session: UserSession | null
+): boolean => {
+  if (!session) return false;
+  const nick = session.nickname?.trim() ?? '';
+  return (
+    session.onboardingComplete === true &&
+    session.ageConsent === true &&
+    nick.length > 2
+  );
+};
+
+/**
+ * Clear user session (sign out)
+ */
 export const clearUserSession = async (): Promise<void> => {
   try {
     await AsyncStorage.removeItem(SESSION_KEY);
   } catch (error) {
-    console.error('Error clearing session:', error);
+    console.error('Error clearing user session:', error);
+    throw error;
   }
 };
 
-export const generateAnonId = (): string => {
-  return `child_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 9)}`;
+/**
+ * Check if user session exists
+ */
+export const hasUserSession = async (): Promise<boolean> => {
+  const session = await getUserSession();
+  return session !== null;
 };
 
-export const isSessionFullyOnboarded = (session: UserSession | null): boolean => {
-  if (!session) return false;
-  return !!(
-    session.onboardingComplete === true &&
-    session.nickname &&
-    session.nickname.length > 2 &&
-    session.age !== undefined
-  );
+/**
+ * Get current timestamp
+ */
+export const getCurrentTimestamp = (): number => {
+  return Date.now();
+};
+
+/**
+ * Update specific fields in user session
+ */
+export const updateUserSession = async (
+  updates: Partial<UserSession>
+): Promise<void> => {
+  const session = await getUserSession();
+  if (!session) {
+    throw new Error('No active user session');
+  }
+  await saveUserSession({ ...session, ...updates });
 };
