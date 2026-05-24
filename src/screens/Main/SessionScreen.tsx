@@ -307,11 +307,11 @@ export default function SessionScreen({ navigation, route }: any) {
       case "listening":
         return "👂 Listening... Release when done";
       case "thinking":
-        return `🤔 ${character?.name} is thinking...`;
+        return `🤔 ${character?.name} is thinking... Please wait!`;
       case "talking":
         return `💬 ${character?.name} is speaking...`;
       default:
-        return "🎙️ Press and hold mic to speak";
+        return "🎙️ Press and hold mic to speak!";
     }
   };
 
