@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     marginTop: 25,
     shadowColor: "#7C5CBF",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.4,
     shadowRadius: 5,
     elevation: 5,
   },
