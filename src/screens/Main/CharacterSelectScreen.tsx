@@ -262,7 +262,7 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
               })
             }
           >
-            <Text style={styles.buttonText}>Choose {current.name}!</Text>
+            <Text style={styles.buttonText}>Pick {current.name}!</Text>
             <Ionicons name="arrow-forward" size={22} color="white" />
           </TouchableOpacity>
         </View>
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     marginTop: 25,
     shadowColor: "#7C5CBF",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.4,
     shadowRadius: 5,
     elevation: 5,
   },

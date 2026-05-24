@@ -1,4 +1,6 @@
-// src/services/gemini.ts
+// Gemini API configuration for Guftagu AI characters
+// Handles responses for Zara, Robo Bhaya, and Ustad Sahab
+// UI/UX adjustments by iman
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
