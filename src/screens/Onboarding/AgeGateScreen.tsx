@@ -1,19 +1,19 @@
+// src/screens/Onboarding/AgeGateScreen.tsx
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity,
-  StyleSheet, Image, Dimensions
+  StyleSheet, Image, Dimensions, Alert
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-// Ensure this path matches where you saved your hook
-import { usePreloadAssets } from '../../hooks/usePreloadAssets'; 
+import { saveAgeConsent } from '../../services/onboardingLogic';
 
 const { width } = Dimensions.get('window');
 
 const AGE_OPTIONS = [
   { label: '6 - 7', value: '6-7', icon: 'leaf', color: '#4CAF50' },
-  { label: '8 - 9', value: 'Star', icon: 'star', color: '#FFC107' },
+  { label: '8 - 9', value: '8-9', icon: 'star', color: '#FFC107' },
   { label: '10 - 11', value: '10-11', icon: 'rocket', color: '#2196F3' },
   { label: '12 - 13', value: '12-13', icon: 'bulb', color: '#FF9800' },
   { label: '14+', value: '14+', icon: 'ribbon', color: '#9C27B0' },
@@ -21,22 +21,21 @@ const AGE_OPTIONS = [
 
 export default function AgeInputScreen({ navigation }: any) {
   const [selected, setSelected] = useState<string | null>(null);
-  
-  // Gate the screen rendering until fonts and logo are ready
-  const isReady = usePreloadAssets();
 
-  if (!isReady) {
-    // Return a themed loading state to prevent "jank"
-    return <View style={{ flex: 1, backgroundColor: '#EEE6FF' }} />;
-  }
-
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!selected) return;
-    const needsCoppa = selected !== '14+';
-    if (needsCoppa) {
-      navigation.navigate('ParentConsent', { ageGroup: selected });
-    } else {
-      navigation.navigate('NameInput', { ageGroup: selected, coppaRequired: false });
+    
+    try {
+      const { needsParentConsent, age } = await saveAgeConsent(selected);
+      
+      if (needsParentConsent) {
+        navigation.navigate('ParentConsent', { ageGroup: selected });
+      } else {
+        navigation.navigate('NameInput', { ageGroup: selected, coppaRequired: false });
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      Alert.alert('Error', 'Failed to save age. Please try again.');
     }
   };
 
@@ -148,6 +147,7 @@ const styles = StyleSheet.create({
     color: '#8A8A8A',
     textAlign: 'center',
     marginTop: 4,
+    marginBottom: 4,
     lineHeight: 22,
   },
   optionsContainer: {
