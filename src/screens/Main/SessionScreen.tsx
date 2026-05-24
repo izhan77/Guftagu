@@ -311,7 +311,7 @@ export default function SessionScreen({ navigation, route }: any) {
       case "talking":
         return `💬 ${character?.name} is speaking...`;
       default:
-        return "🎙️ Hold mic to speak";
+        return "🎙️ Press and hold to speak";
     }
   };
 
