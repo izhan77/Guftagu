@@ -29,7 +29,7 @@ export default function SplashScreen({ navigation }: any) {
           navigation.replace('CharacterSelect', {
             name: session!.nickname!.trim(),
             ageGroup: ageGroupLabelFromSession(session!.age),
-            fromOnboarding: false,  // ← ADD THIS - hide back button
+            fromOnboarding: false, 
           });
           return;
         }

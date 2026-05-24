@@ -1,4 +1,3 @@
-// src/services/firebase/config.ts
 import { initializeApp } from "firebase/app";
 import { initializeAuth, getReactNativePersistence, getAuth, Auth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
@@ -15,8 +14,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-// Initialize auth with persistence - handle already initialized case
-let auth: Auth;  // ← ADDED THE TYPE HERE
+let auth: Auth;  
 try {
   auth = initializeAuth(app, {
     persistence: getReactNativePersistence(ReactNativeAsyncStorage)

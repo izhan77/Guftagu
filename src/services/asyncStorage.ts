@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-// ✅ uuid removed — was crashing Hermes (no crypto in React Native)
 
 export interface UserSession {
   email: string;
@@ -16,7 +15,7 @@ export interface UserSession {
 const SESSION_KEY = 'guftagu_user_session';
 
 /**
- * Generate a unique anonymous ID — crypto-free, Hermes-safe
+ * Generate a unique anonymous ID 
  */
 export const generateAnonId = (): string => {
   const timestamp = Date.now().toString(36);           // e.g. "lkq3f2a"
