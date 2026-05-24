@@ -2,34 +2,42 @@
 import React, { useState, useRef, useEffect } from "react"
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  Dimensions, Animated, SafeAreaView, ScrollView, Platform
+  Dimensions, Animated, Platform,
+  Modal, ScrollView
 } from "react-native"
 import { VideoView, useVideoPlayer } from "expo-video"
-import { Ionicons } from "@expo/vector-icons"
-import { BlurView } from "expo-blur"
-import { Audio } from "expo-av"
 import { LinearGradient } from "expo-linear-gradient"
-import { useFirestoreSync } from "../../hooks/useFirestoreSync"
+import { SafeAreaView } from "react-native-safe-area-context"
+import { Ionicons } from "@expo/vector-icons"
+import { Audio } from "expo-av"
 import { getCharacterResponse } from "../../services/openai"
 import { getCharacterAudio } from "../../services/elevenlabs"
 import { transcribeAudio } from "../../services/whisper"
-import { analyzeExchange, calculateExchangeScore, getSessionTip } from "../../services/scoring"
-import type { ExchangeMetrics } from "../../services/scoring"
 
-const { width, height } = Dimensions.get("window")
+const { height } = Dimensions.get("window")
 
-const CHAR_ASSETS: Record<string, { idle: any; talking: any }> = {
+const CHAR_CONFIG: Record<string, {
+  idle: any; talking: any
+  gradientTop: string; gradientBottom: string
+  buttonColor: string
+}> = {
   zara: {
-    idle: require("../../../assets/videos/zara/zara_idle.mp4"),
+    idle:    require("../../../assets/videos/zara/zara_idle.mp4"),
     talking: require("../../../assets/videos/zara/zara_talking.mp4"),
+    gradientTop: "#F4EDFF", gradientBottom: "#E0D4FF",
+    buttonColor: "#7C5CBF",
   },
   robo: {
-    idle: require("../../../assets/videos/robo_bhaya/robo_idle.mp4"),
+    idle:    require("../../../assets/videos/robo_bhaya/robo_idle.mp4"),
     talking: require("../../../assets/videos/robo_bhaya/robo_talking.mp4"),
+    gradientTop: "#E8F4FD", gradientBottom: "#BBDEFB",
+    buttonColor: "#2196F3",
   },
   ustad: {
-    idle: require("../../../assets/videos/ustad_sahab/ustad_idle.mp4"),
+    idle:    require("../../../assets/videos/ustad_sahab/ustad_idle.mp4"),
     talking: require("../../../assets/videos/ustad_sahab/ustad_talking.mp4"),
+    gradientTop: "#EAF7EE", gradientBottom: "#C8E6C9",
+    buttonColor: "#4CAF50",
   },
 }
 
@@ -37,141 +45,147 @@ const MAX_EXCHANGES = 3
 
 export default function SessionScreen({ navigation, route }: any) {
   const { character, childName } = route.params || {}
-  const charId = character?.id && CHAR_ASSETS[character.id] ? character.id : "zara"
-  const themeColor = character?.buttonColor || "#7C5CBF"
-  const activeAssets = CHAR_ASSETS[charId]
+  const charId = character?.id && CHAR_CONFIG[character.id] ? character.id : "zara"
+  const cfg = CHAR_CONFIG[charId]
+  const themeColor = cfg.buttonColor
 
-  const [status, setStatus] = useState<"idle" | "listening" | "thinking" | "talking">("idle")
+  const [appStatus, setAppStatus] = useState<"idle" | "listening" | "thinking" | "talking">("idle")
   const [chat, setChat] = useState<{ role: string; text: string }[]>([])
   const [sound, setSound] = useState<Audio.Sound | null>(null)
   const [recording, setRecording] = useState<Audio.Recording | null>(null)
   const [openingShown, setOpeningShown] = useState(false)
   const [exchangeCount, setExchangeCount] = useState(0)
-  const [showChat, setShowChat] = useState(false)
-  const [exchangeMetrics, setExchangeMetrics] = useState<ExchangeMetrics[]>([])
-  const [exchangeScores, setExchangeScores] = useState<number[]>([])
-  const talkingEndTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  useFirestoreSync(navigation)
+  const [showChatModal, setShowChatModal] = useState(false)
 
   const talkOpacity = useRef(new Animated.Value(0)).current
-  const micScale = useRef(new Animated.Value(1)).current
-  const micGlow = useRef(new Animated.Value(0)).current
-  const pulseLoop = useRef<any>(null)
-  const scrollRef = useRef<ScrollView>(null)
+  const micScale    = useRef(new Animated.Value(1)).current
+  const micGlowAnim = useRef(new Animated.Value(0)).current
+  const pulseRef    = useRef<any>(null)
+  const timerRef    = useRef<any>(null)
+  const scrollRef   = useRef<ScrollView>(null)
 
-  const idlePlayer = useVideoPlayer(activeAssets.idle, (p) => {
-    p.loop = true
+  // ─── VIDEO PLAYERS ─────────────────────────────────────────────────────────
+  const idlePlayer = useVideoPlayer(cfg.idle, p => {
+    p.loop  = true
     p.muted = true
-    try { p.play() } catch (e) {}
+    p.play() // call play() in setup — fires as soon as player is ready
   })
 
-  const talkPlayer = useVideoPlayer(activeAssets.talking, (p) => {
-    p.loop = true
+  const talkPlayer = useVideoPlayer(cfg.talking, p => {
+    p.loop  = true
     p.muted = true
+    // do NOT play() here — only play when talking
   })
 
+  // ─── VIDEO STATE MACHINE ───────────────────────────────────────────────────
   useEffect(() => {
-    if (status === "talking") {
-      try { talkPlayer.play() } catch (e) {}
-      Animated.timing(talkOpacity, { toValue: 1, duration: 400, useNativeDriver: true }).start()
+    if (appStatus === "talking") {
+      idlePlayer.pause()
+      try { talkPlayer.replay() } catch (_) {
+        talkPlayer.currentTime = 0
+        talkPlayer.play()
+      }
+      Animated.timing(talkOpacity, {
+        toValue: 1, duration: 300, useNativeDriver: true,
+      }).start()
     } else {
-      Animated.timing(talkOpacity, { toValue: 0, duration: 400, useNativeDriver: true }).start(() => {
-        try { talkPlayer.pause() } catch (e) {}
+      Animated.timing(talkOpacity, {
+        toValue: 0, duration: 300, useNativeDriver: true,
+      }).start(() => {
+        try { talkPlayer.pause() } catch (_) {}
       })
+      try { idlePlayer.play() } catch (_) {}
     }
-  }, [status])
+  }, [appStatus])
 
+  // ─── Cleanup ───────────────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
-      if (sound) { try { sound.unloadAsync() } catch (e) {} }
-      if (recording) { try { recording.stopAndUnloadAsync() } catch (e) {} }
+      if (sound)     { try { sound.unloadAsync() }            catch (_) {} }
+      if (recording) { try { recording.stopAndUnloadAsync() } catch (_) {} }
+      if (timerRef.current) clearTimeout(timerRef.current)
+      try { idlePlayer.pause() } catch (_) {}
+      try { talkPlayer.pause() } catch (_) {}
     }
   }, [sound, recording])
 
+  // ─── Opening message ───────────────────────────────────────────────────────
   useEffect(() => {
     if (!openingShown) {
       const openings: Record<string, string> = {
-        zara: `Yaar ${childName}! Finally you're here! Bolo — kya chal raha hai? 😄`,
-        robo: `BEEP BOOP! Hello ${childName}! Ready for an EPIC conversation? 🤖`,
-        ustad: `Aaao beta, baithao. ${childName} — bahut pyaara naam hai. Ready ho? ☕`,
+        zara:  `Yaar ${childName}! Finally you're here! Bolo kya chal raha hai?`,
+        robo:  `BEEP BOOP! Hello ${childName}! Ready for an EPIC conversation?`,
+        ustad: `Aaao beta, baithao. ${childName} — bahut pyaara naam hai.`,
       }
       setTimeout(() => {
         setChat([{ role: "ai", text: openings[charId] || openings.zara }])
         setOpeningShown(true)
-      }, 600)
+      }, 800)
     }
   }, [])
 
+  // ─── Mic pulse ─────────────────────────────────────────────────────────────
   const startMicPulse = () => {
-    pulseLoop.current = Animated.loop(
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(micScale, { toValue: 1.15, duration: 700, useNativeDriver: true }),
-          Animated.timing(micGlow, { toValue: 1, duration: 700, useNativeDriver: true }),
-        ]),
-        Animated.parallel([
-          Animated.timing(micScale, { toValue: 1, duration: 700, useNativeDriver: true }),
-          Animated.timing(micGlow, { toValue: 0, duration: 700, useNativeDriver: true }),
-        ]),
-      ])
-    )
-    pulseLoop.current.start()
+    pulseRef.current = Animated.loop(Animated.sequence([
+      Animated.parallel([
+        Animated.timing(micScale,    { toValue: 1.2, duration: 600, useNativeDriver: true }),
+        Animated.timing(micGlowAnim, { toValue: 1,   duration: 600, useNativeDriver: true }),
+      ]),
+      Animated.parallel([
+        Animated.timing(micScale,    { toValue: 1,   duration: 600, useNativeDriver: true }),
+        Animated.timing(micGlowAnim, { toValue: 0,   duration: 600, useNativeDriver: true }),
+      ]),
+    ]))
+    pulseRef.current.start()
   }
 
   const stopMicPulse = () => {
-    pulseLoop.current?.stop()
+    pulseRef.current?.stop()
     Animated.parallel([
-      Animated.timing(micScale, { toValue: 1, duration: 200, useNativeDriver: true }),
-      Animated.timing(micGlow, { toValue: 0, duration: 200, useNativeDriver: true }),
+      Animated.timing(micScale,    { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.timing(micGlowAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
     ]).start()
   }
 
+  // ─── Mic handlers ──────────────────────────────────────────────────────────
   const handlePressIn = async () => {
     try {
       if (recording) {
-        try { await recording.stopAndUnloadAsync() } catch (e) {}
+        try { await recording.stopAndUnloadAsync() } catch (_) {}
         setRecording(null)
       }
       const { status: perm } = await Audio.requestPermissionsAsync()
       if (perm !== "granted") return
       await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true })
-      const { recording: newRec } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY)
+      const { recording: newRec } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      )
       setRecording(newRec)
-      setStatus("listening")
+      setAppStatus("listening")
       startMicPulse()
-    } catch (err) {
-      setStatus("idle")
+    } catch {
+      setAppStatus("idle")
     }
   }
 
   const handlePressOut = async () => {
-    if (!recording) { setStatus("idle"); return }
+    if (!recording) { setAppStatus("idle"); return }
     stopMicPulse()
-    setStatus("thinking")
-
+    setAppStatus("thinking")
     try {
       await recording.stopAndUnloadAsync()
       const uri = recording.getURI()
       setRecording(null)
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true })
-      if (!uri) { setStatus("idle"); return }
+      if (!uri) { setAppStatus("idle"); return }
 
       const userSpeech = await transcribeAudio(uri)
-      const finalText = userSpeech || "I want to talk"
-
-      // Analyze speech
-      const metrics = analyzeExchange(finalText)
-      const score = calculateExchangeScore(metrics)
-      const newMetrics = [...exchangeMetrics, metrics]
-      const newScores = [...exchangeScores, score]
-      setExchangeMetrics(newMetrics)
-      setExchangeScores(newScores)
+      const finalText  = userSpeech || "I want to talk"
 
       const updatedChat = [...chat, { role: "user", text: finalText }]
       setChat(updatedChat)
 
-      const aiText = await getCharacterResponse(finalText, charId, childName, updatedChat)
+      const aiText    = await getCharacterResponse(finalText, charId, childName, updatedChat)
       const finalChat = [...updatedChat, { role: "ai", text: aiText }]
       setChat(finalChat)
 
@@ -181,398 +195,279 @@ export default function SessionScreen({ navigation, route }: any) {
       const base64Audio = await getCharacterAudio(aiText, charId)
       if (base64Audio) {
         const { sound: newSound } = await Audio.Sound.createAsync(
-          { uri: base64Audio }, { shouldPlay: true }
+          { uri: base64Audio },
+          { shouldPlay: true }
         )
         setSound(newSound)
-        setStatus("talking")
-        newSound.setOnPlaybackStatusUpdate((ps) => {
+        setAppStatus("talking")
+
+        newSound.setOnPlaybackStatusUpdate(ps => {
           if (ps.isLoaded && ps.didJustFinish) {
             newSound.unloadAsync()
             if (newCount >= MAX_EXCHANGES) {
-              // Go to session complete
-              navigation.navigate("SessionComplete", {
-                childName,
-                character,
-                exchangeScores: newScores,
-                exchangeMetrics: newMetrics,
-                sessionTip: getSessionTip(newMetrics),
-              })
+              navigation.navigate("SessionComplete", { childName, character })
             } else {
-              setStatus("idle")
+              setAppStatus("idle")
             }
           }
         })
       } else {
-        setStatus("talking")
+        setAppStatus("talking")
         const readMs = Math.min(8000, Math.max(2500, aiText.length * 45))
-        talkingEndTimer.current = setTimeout(() => {
+        timerRef.current = setTimeout(() => {
           if (newCount >= MAX_EXCHANGES) {
-            navigation.navigate("SessionComplete", {
-              childName, character,
-              exchangeScores: newScores,
-              exchangeMetrics: newMetrics,
-              sessionTip: getSessionTip(newMetrics),
-            })
+            navigation.navigate("SessionComplete", { childName, character })
           } else {
-            setStatus("idle")
+            setAppStatus("idle")
           }
         }, readMs)
       }
 
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)
-    } catch (error) {
-      setStatus("idle")
+    } catch {
+      setAppStatus("idle")
     }
   }
 
-  const lastTwoMessages = chat.slice(-2)
-  const glowColor = micGlow.interpolate({ inputRange: [0, 1], outputRange: ['transparent', themeColor + '60'] })
+  const glowOpacity = micGlowAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.5] })
+
+  const getStatusLabel = () => {
+    switch (appStatus) {
+      case "listening": return "👂 Listening... Release when done"
+      case "thinking":  return `🤔 ${character?.name} is thinking...`
+      case "talking":   return `💬 ${character?.name} is speaking...`
+      default:          return "🎙️ Hold mic to speak"
+    }
+  }
 
   return (
     <View style={styles.root}>
-      {/* ── CHARACTER TOP HALF ── */}
-      <View style={[styles.topHalf]}>
-        {/* Idle Video */}
-        <VideoView player={idlePlayer} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
+      <LinearGradient colors={[cfg.gradientTop, cfg.gradientBottom]} style={styles.characterSection}>
 
-        {/* Talking overlay */}
+        {/* 
+          ★ KEY FIX: surfaceType="textureView" on BOTH VideoViews
+          Android's default SurfaceView cannot overlap — it punches through
+          other views. textureView fixes overlapping video layers entirely.
+        */}
+        <VideoView
+          player={idlePlayer}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          nativeControls={false}
+          surfaceType="textureView"
+        />
+
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: talkOpacity }]}>
-          <VideoView player={talkPlayer} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
+          <VideoView
+            player={talkPlayer}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            nativeControls={false}
+            surfaceType="textureView"
+          />
         </Animated.View>
 
-        {/* Top gradient overlay */}
         <LinearGradient
-          colors={["rgba(0,0,0,0.35)", "transparent"]}
-          style={[StyleSheet.absoluteFill, { height: 120 }]}
+          colors={["transparent", cfg.gradientBottom + "CC", cfg.gradientBottom]}
+          style={styles.characterBottomMask}
+          locations={[0.45, 0.75, 1]}
           pointerEvents="none"
         />
 
-        {/* Bottom fade to white */}
-        <LinearGradient
-          colors={["transparent", "rgba(255,255,255,0.08)", "#FFFFFF"]}
-          style={styles.bottomFade}
-          locations={[0.55, 0.85, 1]}
-          pointerEvents="none"
-        />
-
-        {/* Header bar */}
-        <SafeAreaView style={styles.headerOverlay}>
-          <View style={styles.headerRow}>
-            <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()}>
-              <Ionicons name="close" size={20} color="white" />
-            </TouchableOpacity>
-
-            <BlurView intensity={30} tint="dark" style={styles.charNamePill}>
-              <Text style={styles.charNameText}>{character?.name || "Zara"}</Text>
-            </BlurView>
-
-            <BlurView intensity={30} tint="dark" style={styles.counterPill}>
-              <Text style={[styles.counterText, { color: themeColor }]}>{exchangeCount}/{MAX_EXCHANGES}</Text>
-            </BlurView>
+        <SafeAreaView style={styles.topBar}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={24} color={themeColor} />
+          </TouchableOpacity>
+          <View style={styles.starsRow}>
+            {Array.from({ length: MAX_EXCHANGES }).map((_, i) => (
+              <Text key={i} style={[styles.star, i < exchangeCount && styles.starFilled]}>
+                {i < exchangeCount ? "⭐" : "☆"}
+              </Text>
+            ))}
+          </View>
+          <View style={[styles.statusPill, { backgroundColor: themeColor + "22" }]}>
+            <Text style={[styles.statusPillText, { color: themeColor }]}>
+              {appStatus === "idle" ? "Ready" : appStatus === "listening" ? "👂" : appStatus === "thinking" ? "🤔" : "💬"}
+            </Text>
           </View>
         </SafeAreaView>
+      </LinearGradient>
 
-        {/* State chip */}
-        {status !== "idle" && (
-          <View style={[styles.stateChip, { backgroundColor: themeColor }]}>
-            <Text style={styles.stateChipText}>
-              {status === "listening" ? "👂 Listening..." :
-               status === "thinking"  ? "🤔 Thinking..."  :
-               "💬 Speaking..."}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* ── BOTTOM HALF ── */}
-      <View style={styles.bottomHalf}>
-
-        {/* Last messages — compact, always visible */}
-        <View style={styles.messagesPreview}>
-          {lastTwoMessages.length === 0 ? (
-            <View style={styles.hintMsg}>
-              <Text style={styles.hintMsgText}>Hold the mic and start speaking! 🎙️</Text>
-            </View>
-          ) : (
-            lastTwoMessages.map((msg, i) => (
-              <View key={i} style={[
-                styles.msgRow,
-                msg.role === "ai" ? styles.aiRow : styles.userRow
-              ]}>
-                <View style={[
-                  styles.msgBubble,
-                  msg.role === "ai"
-                    ? [styles.aiBubble, { borderLeftColor: themeColor }]
-                    : [styles.userBubble, { backgroundColor: themeColor + "20" }]
-                ]}>
-                  <Text style={[
-                    styles.msgBubbleText,
-                    msg.role === "user" && { color: "#555" }
-                  ]} numberOfLines={3}>
-                    {msg.text}
-                  </Text>
-                </View>
-              </View>
-            ))
-          )}
-
-          {status === "thinking" && (
-            <View style={[styles.msgRow, styles.aiRow]}>
-              <View style={[styles.msgBubble, styles.aiBubble, { borderLeftColor: themeColor }]}>
-                <ThinkingDots color={themeColor} />
-              </View>
-            </View>
-          )}
-        </View>
-
-        {/* See full chat toggle */}
-        {chat.length > 2 && (
-          <TouchableOpacity style={styles.seeAllBtn} onPress={() => setShowChat(!showChat)}>
-            <Text style={[styles.seeAllText, { color: themeColor }]}>
-              {showChat ? "Hide chat ↑" : `See all ${chat.length} messages ↓`}
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Full chat expandable */}
-        {showChat && (
-          <ScrollView
-            ref={scrollRef}
-            style={[styles.fullChat, { maxHeight: height * 0.2 }]}
-            showsVerticalScrollIndicator={false}
-          >
-            {chat.map((msg, i) => (
-              <View key={i} style={[styles.msgRow, msg.role === "ai" ? styles.aiRow : styles.userRow]}>
-                <View style={[
-                  styles.msgBubble,
-                  msg.role === "ai"
-                    ? [styles.aiBubble, { borderLeftColor: themeColor }]
-                    : [styles.userBubble, { backgroundColor: themeColor + "20" }]
-                ]}>
-                  <Text style={[styles.msgBubbleText, msg.role === "user" && { color: "#555" }]}>
-                    {msg.text}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </ScrollView>
-        )}
-
-        {/* Mic Area */}
-        <View style={styles.micArea}>
-          {/* Progress dots */}
-          <View style={styles.progressDots}>
-            {Array.from({ length: MAX_EXCHANGES }).map((_, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.progressDot,
-                  i < exchangeCount
-                    ? { backgroundColor: themeColor, width: 24 }
-                    : { backgroundColor: "#E0E0E0", width: 8 }
-                ]}
-              />
-            ))}
-          </View>
-
-          <Text style={styles.hintText}>
-            {status === "idle"      ? "Hold to speak 🎙️"        :
-             status === "listening" ? "Release when done ✋"     :
-             status === "thinking"  ? `${character?.name} is thinking...` :
-                                      `${character?.name} is speaking...`}
+      <LinearGradient colors={[cfg.gradientBottom, "#FFFFFF"]} style={styles.bottomSection}>
+        <TouchableOpacity style={styles.seeChatsBtn} onPress={() => setShowChatModal(true)} activeOpacity={0.7}>
+          <Ionicons name="chatbubbles-outline" size={18} color={themeColor} />
+          <Text style={[styles.seeChatsBtnText, { color: themeColor }]}>
+            See all chats {chat.length > 0 && `(${chat.length})`}
           </Text>
+          <Ionicons name="chevron-up" size={16} color={themeColor} />
+        </TouchableOpacity>
 
-          {/* Mic with glow rings */}
-          <View style={styles.micWrapper}>
-            <Animated.View style={[styles.glowRing, {
-              borderColor: themeColor,
-              opacity: micGlow,
-              transform: [{ scale: micScale }],
-            }]} />
-            <Animated.View style={{ transform: [{ scale: micScale }] }}>
-              <TouchableOpacity
-                onPressIn={handlePressIn}
-                onPressOut={handlePressOut}
-                disabled={status === "thinking" || status === "talking"}
-                style={[
-                  styles.micBtn,
-                  { backgroundColor: status === "listening" ? "#FF3B30" : themeColor },
-                  (status === "thinking" || status === "talking") && { opacity: 0.5 }
-                ]}
-                activeOpacity={0.85}
-              >
-                <Ionicons
-                  name={status === "listening" ? "stop" : "mic"}
-                  size={32}
-                  color="white"
-                />
+        <Text style={styles.statusLabel}>{getStatusLabel()}</Text>
+
+        <View style={styles.micArea}>
+          <Animated.View style={[styles.micGlowRing, {
+            borderColor: appStatus === "listening" ? "#FF3B30" : themeColor,
+            opacity: glowOpacity, transform: [{ scale: micScale }],
+          }]} />
+          <Animated.View style={[styles.micGlowRingInner, {
+            borderColor: appStatus === "listening" ? "#FF3B30" : themeColor,
+            opacity: Animated.multiply(glowOpacity, new Animated.Value(0.5)),
+            transform: [{ scale: micScale }],
+          }]} />
+          <Animated.View style={{ transform: [{ scale: micScale }] }}>
+            <TouchableOpacity
+              onPressIn={handlePressIn}
+              onPressOut={handlePressOut}
+              disabled={appStatus === "thinking" || appStatus === "talking"}
+              activeOpacity={0.85}
+              style={[styles.micBtn, {
+                backgroundColor: appStatus === "listening" ? "#FF3B30" : themeColor,
+                opacity: (appStatus === "thinking" || appStatus === "talking") ? 0.45 : 1,
+              }]}
+            >
+              <Ionicons name={appStatus === "listening" ? "stop" : "mic"} size={36} color="white" />
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
+      </LinearGradient>
+
+      <Modal visible={showChatModal} animationType="slide" transparent onRequestClose={() => setShowChatModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderLeft}>
+                <View style={[styles.modalCharDot, { backgroundColor: themeColor }]}>
+                  <Text style={styles.modalCharDotText}>
+                    {charId === "zara" ? "Z" : charId === "robo" ? "R" : "U"}
+                  </Text>
+                </View>
+                <View>
+                  <Text style={styles.modalTitle}>Chat with {character?.name}</Text>
+                  <Text style={styles.modalSubtitle}>{chat.length} messages · Session {exchangeCount}/{MAX_EXCHANGES}</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowChatModal(false)} style={styles.modalCloseBtn}>
+                <Ionicons name="close" size={22} color="#555" />
               </TouchableOpacity>
-            </Animated.View>
+            </View>
+
+            <ScrollView
+              ref={scrollRef}
+              style={styles.modalScroll}
+              contentContainerStyle={styles.modalScrollContent}
+              showsVerticalScrollIndicator={false}
+              onLayout={() => scrollRef.current?.scrollToEnd({ animated: false })}
+            >
+              {chat.length === 0 ? (
+                <View style={styles.emptyChat}>
+                  <Text style={styles.emptyChatEmoji}>💬</Text>
+                  <Text style={styles.emptyChatText}>No messages yet. Start talking!</Text>
+                </View>
+              ) : (
+                chat.map((msg, i) => (
+                  <View key={i} style={[styles.msgRow, msg.role === "ai" ? styles.aiRow : styles.userRow]}>
+                    {msg.role === "ai" && (
+                      <View style={[styles.msgAvatar, { backgroundColor: themeColor }]}>
+                        <Text style={styles.msgAvatarText}>{charId === "zara" ? "Z" : charId === "robo" ? "R" : "U"}</Text>
+                      </View>
+                    )}
+                    <View style={[styles.msgBubble,
+                      msg.role === "ai" ? [styles.aiBubble, { borderLeftColor: themeColor }] : [styles.userBubble, { backgroundColor: themeColor }]
+                    ]}>
+                      <Text style={[styles.msgText, msg.role === "user" && { color: "white" }]}>{msg.text}</Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+
+            <View style={[styles.modalFooter, { borderTopColor: themeColor + "22" }]}>
+              <Text style={styles.modalFooterText}>🎙️ Close and keep talking to {character?.name}!</Text>
+            </View>
           </View>
         </View>
-      </View>
-    </View>
-  )
-}
-
-function ThinkingDots({ color }: { color: string }) {
-  const dots = [
-    useRef(new Animated.Value(0.3)).current,
-    useRef(new Animated.Value(0.3)).current,
-    useRef(new Animated.Value(0.3)).current,
-  ]
-  useEffect(() => {
-    dots.forEach((dot, i) => {
-      Animated.loop(Animated.sequence([
-        Animated.delay(i * 200),
-        Animated.timing(dot, { toValue: 1, duration: 400, useNativeDriver: true }),
-        Animated.timing(dot, { toValue: 0.3, duration: 400, useNativeDriver: true }),
-      ])).start()
-    })
-  }, [])
-  return (
-    <View style={{ flexDirection: "row", gap: 6, alignItems: "center", height: 20 }}>
-      {dots.map((dot, i) => (
-        <Animated.View key={i} style={{
-          width: 8, height: 8, borderRadius: 4,
-          backgroundColor: color, opacity: dot,
-          transform: [{ scale: dot }],
-        }} />
-      ))}
+      </Modal>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#FFFFFF" },
-  topHalf: {
-    height: height * 0.52,
-    position: "relative",
-    overflow: "hidden",
-    backgroundColor: "#1a1a1a",
+  root: { flex: 1 },
+  characterSection: { height: height * 0.60, position: "relative", overflow: "hidden" },
+  characterBottomMask: { position: "absolute", bottom: 0, left: 0, right: 0, height: height * 0.22 },
+  topBar: {
+    position: "absolute", top: 0, left: 0, right: 0,
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 16, paddingTop: Platform.OS === "android" ? 36 : 0,
   },
-  bottomFade: {
-    position: "absolute",
-    bottom: 0, left: 0, right: 0,
-    height: 100,
-  },
-  headerOverlay: {
-    position: "absolute",
-    top: 0, left: 0, right: 0,
-  },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === "android" ? 44 : 8,
-  },
-  headerBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.2)",
+  backBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.85)",
     alignItems: "center", justifyContent: "center",
+    elevation: 3, shadowOpacity: 0.1, shadowRadius: 6,
   },
-  charNamePill: {
-    paddingHorizontal: 16, paddingVertical: 6,
-    borderRadius: 20, overflow: "hidden",
+  starsRow: { flexDirection: "row", gap: 8, alignItems: "center" },
+  star: { fontSize: 22, color: "#CCCCCC" },
+  starFilled: { color: "#FFD700" },
+  statusPill: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
+  statusPillText: { fontSize: 13, fontFamily: "Poppins-Bold" },
+  bottomSection: {
+    flex: 1, alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 24, paddingTop: 16,
+    paddingBottom: Platform.OS === "ios" ? 32 : 24,
   },
-  charNameText: {
-    color: "white", fontSize: 16,
-    fontFamily: "Poppins-Bold",
+  seeChatsBtn: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: "rgba(255,255,255,0.7)",
+    paddingHorizontal: 18, paddingVertical: 10, borderRadius: 99,
+    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.9)",
+    elevation: 2, shadowOpacity: 0.08, shadowRadius: 6,
   },
-  counterPill: {
-    paddingHorizontal: 12, paddingVertical: 6,
-    borderRadius: 12, overflow: "hidden",
-  },
-  counterText: { fontSize: 13, fontFamily: "Poppins-Bold" },
-  stateChip: {
-    position: "absolute",
-    bottom: 52,
-    alignSelf: "center",
-    paddingHorizontal: 16, paddingVertical: 6,
-    borderRadius: 20,
-  },
-  stateChipText: {
-    color: "white", fontSize: 12,
-    fontFamily: "Poppins-SemiBold",
-  },
-  bottomHalf: {
-    flex: 1, backgroundColor: "#FFFFFF",
-    paddingHorizontal: 16,
-    paddingTop: 12,
-  },
-  messagesPreview: {
-    gap: 8,
-    minHeight: 80,
-  },
-  hintMsg: {
-    backgroundColor: "#F5F5F5",
-    borderRadius: 16, padding: 14,
-    alignSelf: "flex-start", maxWidth: "85%",
-  },
-  hintMsgText: {
-    fontSize: 14, fontFamily: "Poppins-Medium",
-    color: "#888888",
-  },
-  msgRow: { marginBottom: 4 },
-  aiRow: { alignSelf: "flex-start", maxWidth: "88%" },
-  userRow: { alignSelf: "flex-end", maxWidth: "75%" },
-  msgBubble: { borderRadius: 18, padding: 12 },
-  aiBubble: {
-    backgroundColor: "#F5F5F5",
-    borderTopLeftRadius: 4,
-    borderLeftWidth: 3,
-  },
-  userBubble: {
-    borderTopRightRadius: 4,
-  },
-  msgBubbleText: {
-    fontSize: 14, fontFamily: "Poppins-Medium",
-    color: "#2D2D2D", lineHeight: 20,
-  },
-  seeAllBtn: {
-    alignSelf: "center",
-    paddingVertical: 6,
-  },
-  seeAllText: {
-    fontSize: 12, fontFamily: "Poppins-SemiBold",
-  },
-  fullChat: { marginBottom: 4 },
-  micArea: {
-    alignItems: "center",
-    paddingBottom: Platform.OS === "ios" ? 24 : 20,
-    paddingTop: 8,
-    gap: 6,
-    marginTop: "auto",
-  },
-  progressDots: {
-    flexDirection: "row",
-    gap: 6,
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  progressDot: {
-    height: 8, borderRadius: 4,
-  },
-  hintText: {
-    fontSize: 12, fontFamily: "Poppins-Medium",
-    color: "#AAAAAA",
-  },
-  micWrapper: {
-    alignItems: "center",
-    justifyContent: "center",
-    width: 90, height: 90,
-  },
-  glowRing: {
-    position: "absolute",
-    width: 86, height: 86,
-    borderRadius: 43, borderWidth: 2.5,
-  },
+  seeChatsBtnText: { fontSize: 13, fontFamily: "Poppins-SemiBold" },
+  statusLabel: { fontSize: 13, fontFamily: "Poppins-SemiBold", color: "#555555", textAlign: "center" },
+  micArea: { alignItems: "center", justifyContent: "center", width: 88, height: 88 },
+  micGlowRing: { position: "absolute", width: 86, height: 86, borderRadius: 43, borderWidth: 3 },
+  micGlowRingInner: { position: "absolute", width: 72, height: 72, borderRadius: 36, borderWidth: 2 },
   micBtn: {
-    width: 70, height: 70, borderRadius: 35,
+    width: 72, height: 72, borderRadius: 36,
     alignItems: "center", justifyContent: "center",
-    elevation: 10,
-    shadowColor: "#000",
-    shadowOpacity: 0.25, shadowRadius: 10,
+    elevation: 12, shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 12,
   },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
+  modalSheet: {
+    backgroundColor: "white", borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    maxHeight: height * 0.78, paddingBottom: Platform.OS === "ios" ? 34 : 20, overflow: "hidden",
+  },
+  modalHandle: {
+    width: 40, height: 4, borderRadius: 2, backgroundColor: "#DDDDDD",
+    alignSelf: "center", marginTop: 10, marginBottom: 4,
+  },
+  modalHeader: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 20, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: "#F0F0F0",
+  },
+  modalHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  modalCharDot: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  modalCharDotText: { color: "white", fontSize: 16, fontFamily: "Poppins-Bold" },
+  modalTitle: { fontSize: 16, fontFamily: "Poppins-Bold", color: "#1A1A1A" },
+  modalSubtitle: { fontSize: 11, fontFamily: "Poppins-Medium", color: "#AAAAAA" },
+  modalCloseBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center" },
+  modalScroll: { flex: 1, paddingHorizontal: 16 },
+  modalScrollContent: { paddingVertical: 16, gap: 10 },
+  emptyChat: { alignItems: "center", paddingVertical: 40, gap: 10 },
+  emptyChatEmoji: { fontSize: 48 },
+  emptyChatText: { fontSize: 14, fontFamily: "Poppins-Medium", color: "#AAAAAA" },
+  msgRow: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
+  aiRow: { alignSelf: "flex-start", maxWidth: "88%" },
+  userRow: { alignSelf: "flex-end", flexDirection: "row-reverse", maxWidth: "78%" },
+  msgAvatar: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  msgAvatarText: { color: "white", fontSize: 12, fontFamily: "Poppins-Bold" },
+  msgBubble: { borderRadius: 18, padding: 12, flexShrink: 1 },
+  aiBubble: { backgroundColor: "#F5F5F5", borderTopLeftRadius: 4, borderLeftWidth: 3 },
+  userBubble: { borderTopRightRadius: 4 },
+  msgText: { fontSize: 14, fontFamily: "Poppins-Medium", color: "#2D2D2D", lineHeight: 20 },
+  modalFooter: { paddingVertical: 12, paddingHorizontal: 20, borderTopWidth: 1, alignItems: "center" },
+  modalFooterText: { fontSize: 12, fontFamily: "Poppins-Medium", color: "#AAAAAA" },
 })
