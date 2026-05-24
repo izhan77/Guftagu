@@ -41,7 +41,7 @@ const CHAR_CONFIG: Record<
   },
   robo: {
     idle: require("../../../assets/videos/robo_bhaya/robo_idle.mov"),
-    talking: require("../../../assets/videos/robo_bhaya/robo_talking.mp4"),
+    talking: require("../../../assets/videos/robo_bhaya/robo_talking.mov"),
     gradientTop: "#E8F4FD",
     gradientBottom: "#BBDEFB",
     buttonColor: "#2196F3",
