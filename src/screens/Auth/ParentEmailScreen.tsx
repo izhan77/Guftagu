@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 30,
   },
-  logo: { width: 140, height: 50 },
+  logo: { width: 145, height: 55 },
   cardContainer: { flex: 1, width: "100%" },
   stepContent: { width: "100%", alignItems: "center" },
   title: {
