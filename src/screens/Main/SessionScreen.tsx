@@ -33,8 +33,8 @@ const CHAR_CONFIG: Record<
   }
 > = {
   zara: {
-    idle: require("../../../assets/videos/zara/zara_idle.mp4"),
-    talking: require("../../../assets/videos/zara/zara_talking.mp4"),
+    idle: require("../../../assets/videos/zara/zara_idle.mov"),
+    talking: require("../../../assets/videos/zara/zara_talking.mov"),
     gradientTop: "#F4EDFF",
     gradientBottom: "#E0D4FF",
     buttonColor: "#7C5CBF",
@@ -47,8 +47,8 @@ const CHAR_CONFIG: Record<
     buttonColor: "#2196F3",
   },
   ustad: {
-    idle: require("../../../assets/videos/ustad_sahab/ustad_idle.mp4"),
-    talking: require("../../../assets/videos/ustad_sahab/ustad_talking.mp4"),
+    idle: require("../../../assets/videos/ustad_sahab/ustad_idle.mov"),
+    talking: require("../../../assets/videos/ustad_sahab/ustad_talking.mov"),
     gradientTop: "#EAF7EE",
     gradientBottom: "#C8E6C9",
     buttonColor: "#4CAF50",
