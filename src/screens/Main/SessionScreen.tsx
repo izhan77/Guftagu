@@ -307,11 +307,11 @@ export default function SessionScreen({ navigation, route }: any) {
       case "listening":
         return "👂 Listening... Release when done";
       case "thinking":
-        return `🤔 ${character?.name} is thinking...`;
+        return `🤔 ${character?.name} is thinking... Please wait!`;
       case "talking":
         return `💬 ${character?.name} is speaking...`;
       default:
-        return "🎙️ Hold mic to speak";
+        return "🎙️ Press and hold mic to speak!";
     }
   };
 
@@ -622,7 +622,7 @@ const styles = StyleSheet.create({
   star: { fontSize: 22, color: "#CCCCCC" },
   starFilled: { color: "#FFD700" },
   statusPill: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
-  statusPillText: { fontSize: 13, fontFamily: "Poppins-Bold" },
+  statusPillText: { fontSize: 13, fontFamily: "Poppins-Bold", letterSpacing: 0.5 },
   bottomSection: {
     flex: 1,
     alignItems: "center",
