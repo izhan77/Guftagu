@@ -622,7 +622,7 @@ const styles = StyleSheet.create({
   star: { fontSize: 22, color: "#CCCCCC" },
   starFilled: { color: "#FFD700" },
   statusPill: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
-  statusPillText: { fontSize: 13, fontFamily: "Poppins-Bold" },
+  statusPillText: { fontSize: 13, fontFamily: "Poppins-Bold", letterSpacing: 0.5 },
   bottomSection: {
     flex: 1,
     alignItems: "center",
