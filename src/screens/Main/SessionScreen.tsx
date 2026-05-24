@@ -251,10 +251,14 @@ export default function SessionScreen({ navigation, route }: any) {
 
   const getStatusLabel = () => {
     switch (appStatus) {
-      case "listening": return "👂 Listening... Release when done";
-      case "thinking": return `🤔 ${character?.name} is thinking...`;
-      case "talking": return `💬 ${character?.name} is speaking...`;
-      default: return "🎙️ Hold mic to speak";
+      case "listening":
+        return "👂 Listening... Release when done";
+      case "thinking":
+        return `🤔 ${character?.name} is thinking... Please wait!`;
+      case "talking":
+        return `💬 ${character?.name} is speaking...`;
+      default:
+        return "🎙️ Press and hold mic to speak!";
     }
   };
 
@@ -367,14 +371,173 @@ const styles = StyleSheet.create({
   starsRow: { flexDirection: "row", gap: 10, alignItems: "center" },
   star: { fontSize: 26, color: "#CCCCCC" },
   starFilled: { color: "#FFD700" },
-  statusPill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 25 },
-  statusPillText: { fontSize: 14, fontFamily: "Poppins-Bold" },
-  bottomSection: { flex: 1, alignItems: "center", justifyContent: "space-between", paddingHorizontal: 24, paddingTop: 16, paddingBottom: Platform.OS === "ios" ? 40 : 30 },
-  seeChatsBtn: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "rgba(255,255,255,0.85)", paddingHorizontal: 22, paddingVertical: 14, borderRadius: 99, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.9)", elevation: 2, shadowOpacity: 0.08, shadowRadius: 6 },
-  seeChatsBtnText: { fontSize: 15, fontFamily: "Poppins-SemiBold" },
-  statusLabel: { fontSize: 14, fontFamily: "Poppins-SemiBold", color: "#555555", textAlign: "center", marginVertical: 8 },
-  micArea: { alignItems: "center", justifyContent: "center", width: 100, height: 100, marginBottom: 20 },
-  micGlowRing: { position: "absolute", width: 94, height: 94, borderRadius: 47, borderWidth: 3 },
-  micGlowRingInner: { position: "absolute", width: 80, height: 80, borderRadius: 40, borderWidth: 2 },
-  micBtn: { width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center", elevation: 12, shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 12 },
+  statusPill: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
+  statusPillText: { fontSize: 13, fontFamily: "Poppins-Bold", letterSpacing: 0.5 },
+  bottomSection: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: Platform.OS === "ios" ? 32 : 24,
+  },
+  seeChatsBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(255,255,255,0.7)",
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 99,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.9)",
+    elevation: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+  },
+  seeChatsBtnText: { fontSize: 13, fontFamily: "Poppins-SemiBold" },
+  statusLabel: {
+    fontSize: 13,
+    fontFamily: "Poppins-SemiBold",
+    color: "#555555",
+    textAlign: "center",
+  },
+  micArea: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 88,
+    height: 88,
+  },
+  micGlowRing: {
+    position: "absolute",
+    width: 86,
+    height: 86,
+    borderRadius: 43,
+    borderWidth: 3,
+  },
+  micGlowRingInner: {
+    position: "absolute",
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 2,
+  },
+  micBtn: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "flex-end",
+  },
+  modalSheet: {
+    backgroundColor: "white",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: height * 0.78,
+    paddingBottom: Platform.OS === "ios" ? 34 : 20,
+    overflow: "hidden",
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#DDDDDD",
+    alignSelf: "center",
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  modalHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  modalCharDot: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalCharDotText: {
+    color: "white",
+    fontSize: 16,
+    fontFamily: "Poppins-Bold",
+  },
+  modalTitle: { fontSize: 16, fontFamily: "Poppins-Bold", color: "#1A1A1A" },
+  modalSubtitle: {
+    fontSize: 11,
+    fontFamily: "Poppins-Medium",
+    color: "#AAAAAA",
+  },
+  modalCloseBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#F5F5F5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalScroll: { flex: 1, paddingHorizontal: 16 },
+  modalScrollContent: { paddingVertical: 16, gap: 10 },
+  emptyChat: { alignItems: "center", paddingVertical: 40, gap: 10 },
+  emptyChatEmoji: { fontSize: 48 },
+  emptyChatText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#AAAAAA",
+  },
+  msgRow: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
+  aiRow: { alignSelf: "flex-start", maxWidth: "88%" },
+  userRow: {
+    alignSelf: "flex-end",
+    flexDirection: "row-reverse",
+    maxWidth: "78%",
+  },
+  msgAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  msgAvatarText: { color: "white", fontSize: 12, fontFamily: "Poppins-Bold" },
+  msgBubble: { borderRadius: 18, padding: 12, flexShrink: 1 },
+  aiBubble: {
+    backgroundColor: "#F5F5F5",
+    borderTopLeftRadius: 4,
+    borderLeftWidth: 3,
+  },
+  userBubble: { borderTopRightRadius: 4 },
+  msgText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#2D2D2D",
+    lineHeight: 20,
+  },
+  modalFooter: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderTopWidth: 1,
+    alignItems: "center",
+  },
+  modalFooterText: {
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#AAAAAA",
+  },
 });
