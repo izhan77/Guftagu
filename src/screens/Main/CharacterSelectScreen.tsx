@@ -262,7 +262,7 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
               })
             }
           >
-            <Text style={styles.buttonText}>Choose {current.name}!</Text>
+            <Text style={styles.buttonText}>Pick {current.name}!</Text>
             <Ionicons name="arrow-forward" size={22} color="white" />
           </TouchableOpacity>
         </View>
