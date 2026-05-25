@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Dimensions,
   Animated,
-  Image,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -17,39 +16,13 @@ import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { auth, db } from "../../services/firebase/config";
 import { calculateSessionScore, updateOverallScore, getLevel } from "../../services/scoring";
 
-const { width, height } = Dimensions.get("window");
-
-function BounceDot({ delay, color }: { delay: number; color: string }) {
-  const y = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.delay(delay),
-        Animated.timing(y, { toValue: -8, duration: 380, useNativeDriver: true }),
-        Animated.timing(y, { toValue: 0, duration: 380, useNativeDriver: true }),
-      ])
-    ).start();
-  }, []);
-  return (
-    <Animated.View
-      style={{
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: color,
-        marginHorizontal: 4,
-        transform: [{ translateY: y }],
-      }}
-    />
-  );
-}
+const { width } = Dimensions.get("window");
 
 export default function SessionCompleteScreen({ navigation, route }: any) {
   const {
     childName,
     character,
     exchangeScores = [],
-    exchangeMetrics = [],
     sessionTip = "",
   } = route.params || {};
 
@@ -137,8 +110,6 @@ export default function SessionCompleteScreen({ navigation, route }: any) {
     <LinearGradient colors={["#EEE6FF", "#E8F4FD"]} style={styles.root}>
       <SafeAreaView style={styles.safe}>
         <Animated.View style={[styles.resultCard, { transform: [{ translateY: cardSlide }], opacity: cardOpacity }]}>
-          {/* Logo */}
-          <Image source={require("../../../assets/logo.png")} style={styles.logo} resizeMode="contain" />
 
           {leveledUp && (
             <View style={[styles.levelUpBadge, { backgroundColor: themeColor }]}>
@@ -146,7 +117,7 @@ export default function SessionCompleteScreen({ navigation, route }: any) {
             </View>
           )}
 
-          <Text style={styles.wellDone}>Shukriya, {childName}! 🎉</Text>
+          <Text style={styles.wellDone}>Thank you, {childName}! 🎉</Text>
 
           <View style={[styles.scoreRing, { borderTopColor: themeColor, borderRightColor: themeColor }]}>
             <Text style={[styles.scoreNumber, { color: themeColor }]}>{displayScore}</Text>
@@ -214,7 +185,6 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 5 },
   },
-  logo: { width: 100, height: 35, marginBottom: 15 },
   levelUpBadge: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 40, marginBottom: 12 },
   levelUpText: { color: "white", fontSize: 14, fontFamily: "Poppins-Bold" },
   wellDone: { fontSize: 24, fontFamily: "Poppins-ExtraBold", color: "#2D2D2D", textAlign: "center", marginBottom: 20 },
