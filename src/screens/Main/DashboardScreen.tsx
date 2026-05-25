@@ -1,6 +1,6 @@
 // src/screens/Main/DashboardScreen.tsx
 // 🎨 MASTERPIECE KIDS DASHBOARD — Age 6–14 Optimized
-import React, { useEffect, useState, useRef } from "react"
+import React, { useEffect, useState, useRef, useCallback } from "react"
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, Dimensions, Image, RefreshControl,
@@ -82,6 +82,204 @@ const pillStyles = StyleSheet.create({
   text: { fontSize: 12, fontFamily: "Poppins-Bold" },
 })
 
+
+// ══════════════════════════════════════════
+// 🦴 SHIMMER SKELETON LOADER
+// ══════════════════════════════════════════
+function useShimmer() {
+  const anim = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, { toValue: 1, duration: 900, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0, duration: 900, useNativeDriver: true }),
+      ])
+    ).start()
+  }, [])
+  return anim
+}
+
+function Bone({ w, h, radius = 10, style }: { w: number | string; h: number; radius?: number; style?: any }) {
+  const anim = useShimmer()
+  const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.85] })
+  const translateX = anim.interpolate({ inputRange: [0, 1], outputRange: [-60, 60] })
+  return (
+    <View style={[{ width: w as any, height: h, borderRadius: radius, overflow: "hidden", backgroundColor: "#E8E3F5" }, style]}>
+      <Animated.View
+        style={{
+          position: "absolute", top: 0, bottom: 0, left: 0, right: 0,
+          opacity,
+          transform: [{ translateX }],
+          backgroundColor: "rgba(255,255,255,0.6)",
+          borderRadius: radius,
+        }}
+      />
+    </View>
+  )
+}
+
+function DashboardSkeleton() {
+  const shimmer = useShimmer()
+  const headerOpacity = shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] })
+
+  return (
+    <View style={{ flex: 1, backgroundColor: "#F3E8FF" }}>
+      <ScrollView showsVerticalScrollIndicator={false}>
+
+        {/* ── Hero skeleton ── */}
+        <Animated.View style={{ opacity: headerOpacity }}>
+          <LinearGradient
+            colors={["#C4B0E8", "#D4C4F0"]}
+            style={skeletonStyles.heroSkel}
+          >
+            <SafeAreaView>
+              <View style={skeletonStyles.heroRow}>
+                <View style={{ flex: 1, gap: 8 }}>
+                  <Bone w={100} h={14} radius={7} />
+                  <Bone w={160} h={32} radius={10} style={{ marginTop: 4 }} />
+                  <Bone w={110} h={26} radius={13} style={{ marginTop: 6 }} />
+                </View>
+                {/* Avatar */}
+                <View style={skeletonStyles.avatarSkel} />
+              </View>
+              {/* Streak bar */}
+              <View style={skeletonStyles.streakSkel}>
+                <Bone w={24} h={24} radius={12} />
+                <Bone w="60%" h={14} radius={7} />
+                <View style={{ flexDirection: "row", gap: 4 }}>
+                  {[1,2,3].map(i => <Bone key={i} w={18} h={18} radius={9} />)}
+                </View>
+              </View>
+            </SafeAreaView>
+          </LinearGradient>
+        </Animated.View>
+
+        {/* ── Stats row skeleton ── */}
+        <View style={skeletonStyles.statsRow}>
+          {[0,1,2].map(i => (
+            <View key={i} style={skeletonStyles.statCardSkel}>
+              <Bone w={32} h={32} radius={16} />
+              <Bone w={40} h={22} radius={8} style={{ marginTop: 8 }} />
+              <Bone w={55} h={12} radius={6} style={{ marginTop: 6 }} />
+            </View>
+          ))}
+        </View>
+
+        {/* ── Confidence card skeleton ── */}
+        <View style={skeletonStyles.card}>
+          <View style={skeletonStyles.cardHeader}>
+            <Bone w={170} h={18} radius={9} />
+            <Bone w={60} h={28} radius={14} />
+          </View>
+          <Bone w="100%" h={32} radius={16} style={{ marginBottom: 10 }} />
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4 }}>
+            <Bone w={110} h={12} radius={6} />
+            <Bone w={110} h={12} radius={6} />
+          </View>
+          <View style={skeletonStyles.milestonesRow}>
+            {[0,1,2,3].map(i => <Bone key={i} w={42} h={42} radius={21} />)}
+          </View>
+        </View>
+
+        {/* ── Challenge card skeleton ── */}
+        <View style={skeletonStyles.challengeSkel}>
+          <View style={{ flex: 1, gap: 10 }}>
+            <Bone w={120} h={26} radius={13} />
+            <Bone w="90%" h={16} radius={8} />
+            <Bone w="75%" h={16} radius={8} />
+            <Bone w={130} h={40} radius={20} style={{ marginTop: 4 }} />
+          </View>
+          <Bone w={56} h={56} radius={28} style={{ marginLeft: 12 }} />
+        </View>
+
+        {/* ── Learning progress skeleton ── */}
+        <View style={skeletonStyles.card}>
+          <View style={skeletonStyles.cardHeader}>
+            <Bone w={190} h={18} radius={9} />
+          </View>
+          {[0,1,2].map(i => (
+            <View key={i} style={skeletonStyles.topicRowSkel}>
+              <Bone w={52} h={52} radius={26} />
+              <View style={{ flex: 1, gap: 8 }}>
+                <Bone w="75%" h={14} radius={7} />
+                <Bone w="100%" h={10} radius={5} />
+                <Bone w={70} h={11} radius={6} />
+              </View>
+              <View style={{ alignItems: "flex-end", gap: 6 }}>
+                <Bone w={42} h={22} radius={8} />
+                <Bone w={80} h={22} radius={11} />
+              </View>
+            </View>
+          ))}
+          <Bone w="100%" h={44} radius={14} style={{ marginTop: 8 }} />
+        </View>
+
+        {/* ── Buddies skeleton ── */}
+        <View style={skeletonStyles.card}>
+          <Bone w={210} h={18} radius={9} style={{ marginBottom: 16 }} />
+          <View style={skeletonStyles.buddiesRow}>
+            {[0,1,2].map(i => (
+              <View key={i} style={skeletonStyles.buddyCardSkel}>
+                <Bone w={64} h={64} radius={32} />
+                <Bone w={55} h={13} radius={6} style={{ marginTop: 8 }} />
+                <Bone w={40} h={11} radius={5} style={{ marginTop: 4 }} />
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Parent portal */}
+        <View style={skeletonStyles.parentRow}>
+          <Bone w={18} h={18} radius={9} />
+          <Bone w={100} h={14} radius={7} />
+        </View>
+
+        <View style={{ height: 100 }} />
+      </ScrollView>
+    </View>
+  )
+}
+
+const skeletonStyles = StyleSheet.create({
+  heroSkel: { paddingHorizontal: 22, paddingBottom: 28, borderBottomLeftRadius: 36, borderBottomRightRadius: 36 },
+  heroRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 10 },
+  avatarSkel: { width: 96, height: 96, borderRadius: 48, backgroundColor: "rgba(255,255,255,0.3)" },
+  streakSkel: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    backgroundColor: "rgba(255,255,255,0.18)", borderRadius: 16,
+    paddingHorizontal: 16, paddingVertical: 12, marginTop: 14,
+  },
+  statsRow: { flexDirection: "row", marginHorizontal: 16, marginTop: 16, gap: 10 },
+  statCardSkel: {
+    flex: 1, borderRadius: 22, paddingVertical: 16, alignItems: "center",
+    backgroundColor: "#D8CDEE",
+    elevation: 4, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 8,
+  },
+  card: {
+    backgroundColor: "white", borderRadius: 26, padding: 20,
+    marginHorizontal: 16, marginTop: 14,
+    elevation: 4, shadowColor: "#000", shadowOpacity: 0.07, shadowRadius: 12,
+  },
+  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
+  milestonesRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 14 },
+  challengeSkel: {
+    backgroundColor: "#E0D0F5", borderRadius: 26, padding: 22,
+    flexDirection: "row", alignItems: "center",
+    marginHorizontal: 16, marginTop: 14,
+    elevation: 4, shadowColor: "#000", shadowOpacity: 0.07, shadowRadius: 10,
+  },
+  topicRowSkel: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 18 },
+  buddiesRow: { flexDirection: "row", gap: 10 },
+  buddyCardSkel: {
+    flex: 1, alignItems: "center", borderRadius: 22, padding: 14,
+    borderWidth: 2, borderColor: "#EEEEEE", backgroundColor: "#FAFAFA",
+  },
+  parentRow: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 8, paddingVertical: 16, marginTop: 6,
+  },
+})
+
 export default function DashboardScreen({ navigation }: any) {
   const [userData, setUserData] = useState<any>(null)
   const [recentSessions, setRecentSessions] = useState<any[]>([])
@@ -138,12 +336,7 @@ export default function DashboardScreen({ navigation }: any) {
   const onRefresh = () => { setRefreshing(true); loadData() }
 
   if (isLoading) {
-    return (
-      <LinearGradient colors={["#7C5CBF", "#7C5CBF"]} style={styles.loadingContainer}>
-        <Text style={styles.loadingEmoji}>✨</Text>
-        <Text style={styles.loadingText}>Loading your adventure...</Text>
-      </LinearGradient>
-    )
+    return <DashboardSkeleton />
   }
 
   const nickname = userData?.nickname || "Friend"
@@ -206,6 +399,17 @@ export default function DashboardScreen({ navigation }: any) {
                   </LinearGradient>
                   {/* Online dot */}
                   <View style={styles.onlineDot} />
+                </View>
+              </View>
+
+              {/* Streak banner inside hero */}
+              <View style={styles.streakBanner}>
+                <Text style={styles.streakFire}>🔥</Text>
+                <Text style={styles.streakText}>{streak} Day Streak! Keep it up!</Text>
+                <View style={styles.streakStars}>
+                  {[...Array(Math.min(streak, 5))].map((_, i) => (
+                    <Text key={i} style={{ fontSize: 14 }}>⭐</Text>
+                  ))}
                 </View>
               </View>
             </SafeAreaView>
@@ -440,10 +644,8 @@ export default function DashboardScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   root: { flex: 1 },
 
-  // Loading
+  // Loading (skeleton replaces this — kept for safety)
   loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
-  loadingEmoji: { fontSize: 48, marginBottom: 12 },
-  loadingText: { fontSize: 18, fontFamily: "Poppins-Bold", color: "white" },
 
   // Hero Header
   hero: { paddingHorizontal: 22, paddingBottom: 28, borderBottomLeftRadius: 36, borderBottomRightRadius: 36, overflow: "hidden" },
