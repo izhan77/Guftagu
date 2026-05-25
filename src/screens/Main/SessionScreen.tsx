@@ -137,7 +137,7 @@ export default function SessionScreen({ navigation, route }: any) {
         ustad: `Aaao beta, baithao. ${childName} — bahut pyaara naam hai.`,
       };
       setTimeout(() => {
-        setChat([{ role: "ai", text: openings[charId] || openings.zara }]);
+        setChat([{ role: "assistant", text: openings[charId] || openings.zara }]);
         setOpeningShown(true);
       }, 800);
     }
@@ -208,7 +208,7 @@ export default function SessionScreen({ navigation, route }: any) {
       setChat((prev) => [...prev, { role: "user", text: finalText }]);
 
       const aiText = await getCharacterResponse(finalText, charId, childName, chat);
-      setChat((prev) => [...prev, { role: "ai", text: aiText }]);
+      setChat((prev) => [...prev, { role: "assistant", text: aiText }]);
 
       const newCount = exchangeCount + 1;
       setExchangeCount(newCount);
