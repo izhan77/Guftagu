@@ -150,7 +150,7 @@ export default function SessionCompleteScreen({ navigation, route }: any) {
 
           {/* Primary Button - Solid */}
           <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: themeColor }]} onPress={() => navigation.navigate("Dashboard")}>
-            <Text style={styles.primaryBtnText}>See My Dashboard →</Text>
+            <Text style={styles.primaryBtnText}>See My Dashboard</Text>
           </TouchableOpacity>
 
           {/* Secondary Button - Border Capsule (Kid-friendly) */}
