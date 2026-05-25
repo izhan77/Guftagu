@@ -119,6 +119,7 @@ export default function SessionCompleteScreen({ navigation, route }: any) {
 
           <Text style={styles.wellDone}>Thank you, {childName}! 🎉</Text>
 
+          {/* LARGER SCORE CIRCLE */}
           <View style={[styles.scoreRing, { borderTopColor: themeColor, borderRightColor: themeColor }]}>
             <Text style={[styles.scoreNumber, { color: themeColor }]}>{displayScore}</Text>
             <Text style={styles.scoreLabel}>confidence</Text>
@@ -147,15 +148,18 @@ export default function SessionCompleteScreen({ navigation, route }: any) {
             </View>
           ) : null}
 
+          {/* Primary Button - Solid */}
           <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: themeColor }]} onPress={() => navigation.navigate("Dashboard")}>
             <Text style={styles.primaryBtnText}>See My Dashboard →</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.secondaryBtn} onPress={() => navigation.replace("CharacterSelect", {
+          {/* Secondary Button - Border Capsule (Kid-friendly) */}
+          <TouchableOpacity style={[styles.secondaryBtn, { borderColor: themeColor }]} onPress={() => navigation.replace("CharacterSelect", {
             name: childName, ageGroup: "10-14", fromOnboarding: false,
           })}>
-            <Text style={[styles.secondaryBtnText, { color: themeColor }]}>Talk Again 🎙️</Text>
+            <Text style={[styles.secondaryBtnText, { color: themeColor }]}>🎙️ Talk Again</Text>
           </TouchableOpacity>
+
         </Animated.View>
       </SafeAreaView>
     </LinearGradient>
@@ -174,8 +178,8 @@ const styles = StyleSheet.create({
 
   resultCard: {
     backgroundColor: "white",
-    borderRadius: 32,
-    padding: 24,
+    borderRadius: 36,
+    padding: 28,
     marginHorizontal: 20,
     alignItems: "center",
     width: width - 40,
@@ -185,23 +189,53 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 5 },
   },
-  levelUpBadge: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 40, marginBottom: 12 },
+  levelUpBadge: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 40, marginBottom: 12 },
   levelUpText: { color: "white", fontSize: 14, fontFamily: "Poppins-Bold" },
-  wellDone: { fontSize: 24, fontFamily: "Poppins-ExtraBold", color: "#2D2D2D", textAlign: "center", marginBottom: 20 },
-  scoreRing: { width: 130, height: 130, borderRadius: 65, borderWidth: 12, borderColor: "#F0F0F0", alignItems: "center", justifyContent: "center", marginBottom: 12 },
-  scoreNumber: { fontSize: 40, fontFamily: "Poppins-ExtraBold" },
-  scoreLabel: { fontSize: 12, fontFamily: "Poppins-Medium", color: "#AAAAAA" },
-  levelName: { fontSize: 16, fontFamily: "Poppins-Bold", marginBottom: 20 },
-  statsRow: { flexDirection: "row", gap: 12, marginBottom: 20 },
-  statCard: { backgroundColor: "#F8F4FF", borderRadius: 16, padding: 12, alignItems: "center", minWidth: 85, borderWidth: 1.5 },
-  statIcon: { fontSize: 22, marginBottom: 4 },
+  wellDone: { fontSize: 24, fontFamily: "Poppins-ExtraBold", color: "#2D2D2D", textAlign: "center", marginBottom: 24 },
+
+  // LARGER SCORE CIRCLE
+  scoreRing: { 
+    width: 160, 
+    height: 160, 
+    borderRadius: 80, 
+    borderWidth: 14, 
+    borderColor: "#F0F0F0", 
+    alignItems: "center", 
+    justifyContent: "center", 
+    marginBottom: 16 
+  },
+  scoreNumber: { fontSize: 48, fontFamily: "Poppins-ExtraBold" },
+  scoreLabel: { fontSize: 13, fontFamily: "Poppins-Medium", color: "#AAAAAA", marginTop: 4 },
+
+  levelName: { fontSize: 16, fontFamily: "Poppins-Bold", marginBottom: 24 },
+  statsRow: { flexDirection: "row", gap: 14, marginBottom: 24 },
+  statCard: { backgroundColor: "#F8F4FF", borderRadius: 18, padding: 12, alignItems: "center", minWidth: 88, borderWidth: 1.5 },
+  statIcon: { fontSize: 24, marginBottom: 4 },
   statVal: { fontSize: 18, fontFamily: "Poppins-ExtraBold" },
   statLabel: { fontSize: 11, fontFamily: "Poppins-Medium", color: "#8A8A8A" },
-  tipCard: { backgroundColor: "#FFF8E7", borderRadius: 16, padding: 14, width: "100%", marginBottom: 20, borderWidth: 1.5, borderColor: "#FFE082" },
+  tipCard: { backgroundColor: "#FFF8E7", borderRadius: 18, padding: 14, width: "100%", marginBottom: 24, borderWidth: 1.5, borderColor: "#FFE082" },
   tipTitle: { fontSize: 12, fontFamily: "Poppins-Bold", color: "#F59E0B", marginBottom: 4 },
   tipText: { fontSize: 13, fontFamily: "Poppins-Medium", color: "#555555", lineHeight: 18 },
-  primaryBtn: { width: "100%", paddingVertical: 16, borderRadius: 30, alignItems: "center", marginBottom: 12, elevation: 4 },
-  primaryBtnText: { color: "white", fontSize: 16, fontFamily: "Poppins-Bold" },
-  secondaryBtn: { paddingVertical: 10 },
-  secondaryBtnText: { fontSize: 14, fontFamily: "Poppins-SemiBold" },
+
+  // LARGER PRIMARY BUTTON (for small fingers)
+  primaryBtn: { 
+    width: "100%", 
+    paddingVertical: 18, 
+    borderRadius: 40, 
+    alignItems: "center", 
+    marginBottom: 14, 
+    elevation: 6,
+  },
+  primaryBtnText: { color: "white", fontSize: 17, fontFamily: "Poppins-Bold" },
+
+  // BORDER CAPSULE BUTTON (kid-friendly, easy to tap)
+  secondaryBtn: { 
+    width: "100%", 
+    paddingVertical: 16, 
+    borderRadius: 40, 
+    alignItems: "center", 
+    borderWidth: 2.5,
+    backgroundColor: "white",
+  },
+  secondaryBtnText: { fontSize: 16, fontFamily: "Poppins-SemiBold" },
 });
