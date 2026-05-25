@@ -157,7 +157,7 @@ export default function SessionCompleteScreen({ navigation, route }: any) {
           <TouchableOpacity style={[styles.secondaryBtn, { borderColor: themeColor }]} onPress={() => navigation.replace("CharacterSelect", {
             name: childName, ageGroup: "10-14", fromOnboarding: false,
           })}>
-            <Text style={[styles.secondaryBtnText, { color: themeColor }]}>🎙️ Talk Again</Text>
+            <Text style={[styles.secondaryBtnText, { color: themeColor }]}>Talk Again</Text>
           </TouchableOpacity>
 
         </Animated.View>
