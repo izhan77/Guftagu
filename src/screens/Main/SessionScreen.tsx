@@ -317,6 +317,21 @@ export default function SessionScreen({ navigation, route }: any) {
         </View>
       </LinearGradient>
 
+      // Add this near the bottom, after mic button or inside bottomSection
+<TouchableOpacity
+  style={styles.testCompleteBtn}
+  onPress={() => navigation.navigate("SessionComplete", {
+    childName,
+    character,
+    exchangeScores: [65, 72, 78],
+    exchangeMetrics: [],
+    sessionTip: "Try to take a breath before speaking",
+  })}
+>
+  <Ionicons name="arrow-forward-circle" size={32} color={themeColor} />
+  <Text style={{ color: themeColor, fontSize: 12 }}>Test Complete</Text>
+</TouchableOpacity>
+
       {/* SIMPLE WORKING MODAL */}
       <Modal visible={showChatModal} animationType="slide" transparent onRequestClose={() => setShowChatModal(false)}>
         <View style={{ flex: 1, backgroundColor: 'white', marginTop: 50 }}>
@@ -363,6 +378,16 @@ export default function SessionScreen({ navigation, route }: any) {
 }
 
 const styles = StyleSheet.create({
+  testCompleteBtn: {
+  position: 'absolute',
+  bottom: 10,
+  right: 10,
+  alignItems: 'center',
+  backgroundColor: 'rgba(255,255,255,0.7)',
+  padding: 8,
+  borderRadius: 30,
+  zIndex: 100,
+},
   root: { flex: 1 },
   characterSection: { height: height * 0.6, position: "relative", overflow: "hidden" },
   characterBottomMask: { position: "absolute", bottom: 0, left: 0, right: 0, height: height * 0.22, zIndex: 10 },
