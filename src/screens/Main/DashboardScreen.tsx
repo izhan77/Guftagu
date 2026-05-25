@@ -37,29 +37,29 @@ const CHAR_BG_COLORS: Record<string, string> = {
 
 // Recent practiced topics with confidence
 const MOCK_TOPICS = [
-  { id: "1", topic: "My Favourite Food 🍛", confidence: 82, date: "Today", charId: "zara" },
-  { id: "2", topic: "My School Day 🏫", confidence: 74, date: "Yesterday", charId: "robo" },
-  { id: "3", topic: "My Best Friend 👫", confidence: 91, date: "2 days ago", charId: "ustad" },
+  { id: "1", topic: "My Favourite Food", confidence: 82, date: "Today", charId: "zara" },
+  { id: "2", topic: "My School Day", confidence: 74, date: "Yesterday", charId: "robo" },
+  { id: "3", topic: "My Best Friend", confidence: 91, date: "2 days ago", charId: "ustad" },
 ]
 
 // All chats for modal
 const ALL_CHATS = [
-  { id: "1", topic: "My Favourite Food 🍛", confidence: 82, date: "May 26", charId: "zara", duration: "4 min" },
-  { id: "2", topic: "My School Day 🏫", confidence: 74, date: "May 25", charId: "robo", duration: "6 min" },
-  { id: "3", topic: "My Best Friend 👫", confidence: 91, date: "May 24", charId: "ustad", duration: "3 min" },
-  { id: "4", topic: "My Dream House 🏠", confidence: 65, date: "May 23", charId: "zara", duration: "5 min" },
-  { id: "5", topic: "My Favourite Game 🎮", confidence: 78, date: "May 22", charId: "robo", duration: "7 min" },
-  { id: "6", topic: "What Made Me Smile 😊", confidence: 88, date: "May 21", charId: "ustad", duration: "4 min" },
-  { id: "7", topic: "My Morning Routine ☀️", confidence: 70, date: "May 20", charId: "zara", duration: "5 min" },
+  { id: "1", topic: "My Favourite Food", confidence: 82, date: "May 26", charId: "zara", duration: "4 min" },
+  { id: "2", topic: "My School Day", confidence: 74, date: "May 25", charId: "robo", duration: "6 min" },
+  { id: "3", topic: "My Best Friend", confidence: 91, date: "May 24", charId: "ustad", duration: "3 min" },
+  { id: "4", topic: "My Dream House", confidence: 65, date: "May 23", charId: "zara", duration: "5 min" },
+  { id: "5", topic: "My Favourite Game", confidence: 78, date: "May 22", charId: "robo", duration: "7 min" },
+  { id: "6", topic: "What Made Me Smile", confidence: 88, date: "May 21", charId: "ustad", duration: "4 min" },
+  { id: "7", topic: "My Morning Routine", confidence: 70, date: "May 20", charId: "zara", duration: "5 min" },
 ]
 
 const DAILY_PROMPTS = [
-  "What's your favorite food in Karachi? 🍛",
-  "Tell me about your school! 🏫",
-  "Describe your best friend! 👫",
-  "What made you smile today? 😊",
-  "What's your favorite game? 🎮",
-  "Describe your dream house! 🏠",
+  "What's your favorite food in Karachi?",
+  "Tell me about your school!",
+  "Describe your best friend!",
+  "What made you smile today?",
+  "What's your favorite game?",
+  "Describe your dream house!",
 ]
 
 const CHAR_LABELS: Record<string, string> = {
@@ -397,19 +397,6 @@ export default function DashboardScreen({ navigation }: any) {
                       resizeMode="cover"
                     />
                   </LinearGradient>
-                  {/* Online dot */}
-                  <View style={styles.onlineDot} />
-                </View>
-              </View>
-
-              {/* Streak banner inside hero */}
-              <View style={styles.streakBanner}>
-                <Text style={styles.streakFire}>🔥</Text>
-                <Text style={styles.streakText}>{streak} Day Streak! Keep it up!</Text>
-                <View style={styles.streakStars}>
-                  {[...Array(Math.min(streak, 5))].map((_, i) => (
-                    <Text key={i} style={{ fontSize: 14 }}>⭐</Text>
-                  ))}
                 </View>
               </View>
             </SafeAreaView>
@@ -451,8 +438,8 @@ export default function DashboardScreen({ navigation }: any) {
             </LinearGradient>
           </View>
           <View style={styles.progressLabels}>
-            <Text style={styles.progressLabelText}>🌱 Shy Seedling</Text>
-            <Text style={styles.progressLabelText}>👑 Voice Champion</Text>
+            <Text style={styles.progressLabelText}>Shy Seedling</Text>
+            <Text style={styles.progressLabelText}>Voice Champion</Text>
           </View>
 
           {/* Milestone dots */}
@@ -474,7 +461,7 @@ export default function DashboardScreen({ navigation }: any) {
           >
             <View style={styles.challengeLeft}>
               <View style={styles.challengeBadgePill}>
-                <Text style={styles.challengeBadgeLabel}>⚡ Today's Challenge</Text>
+                <Text style={styles.challengeBadgeLabel}>Today's Challenge</Text>
               </View>
               <Text style={styles.challengeQuestion}>{todayPrompt}</Text>
               <TouchableOpacity
@@ -482,7 +469,7 @@ export default function DashboardScreen({ navigation }: any) {
                 onPress={() => navigation.navigate("CharacterSelect", { name: nickname, ageGroup: "10-14", fromOnboarding: false })}
                 activeOpacity={0.85}
               >
-                <Text style={styles.challengeBtnText}>Start Talking! 🎙️</Text>
+                <Text style={styles.challengeBtnText}>Start Talking!</Text>
               </TouchableOpacity>
             </View>
             <Text style={styles.challengeBigEmoji}>🎯</Text>
@@ -537,7 +524,7 @@ export default function DashboardScreen({ navigation }: any) {
 
         {/* ══════════ SPEAKING BUDDIES ══════════ */}
         <Animated.View style={[styles.card, { opacity: cardAnim }]}>
-          <Text style={styles.cardTitle}>My Speaking Buddies 🤝</Text>
+          <Text style={styles.cardTitle}>My Speaking Buddies</Text>
           <View style={styles.buddiesRow}>
             {(["zara", "robo", "ustad"] as const).map((id) => {
               const [bc1, bc2] = CHAR_COLORS[id]
@@ -599,7 +586,7 @@ export default function DashboardScreen({ navigation }: any) {
             <View style={styles.modalHandle} />
 
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>All My Chats 💬</Text>
+              <Text style={styles.modalTitle}>All My Chats</Text>
               <TouchableOpacity onPress={() => setShowChatsModal(false)} style={styles.modalClose}>
                 <Ionicons name="close-circle" size={28} color="#CCCCCC" />
               </TouchableOpacity>
