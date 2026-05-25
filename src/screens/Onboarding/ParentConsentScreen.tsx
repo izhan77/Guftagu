@@ -17,14 +17,11 @@ const validateEmail = (email: string): { isValid: boolean; errorMessage: string 
   
   const emailRegex = /^[^\s@]+@([^\s@.,]+\.)+[^\s@.,]{2,}$/;
   if (!emailRegex.test(email)) {
-    return { isValid: false, errorMessage: "Please enter a valid email address" };
+    return { isValid: false, errorMessage: "Make sure your email follows the correct format" };
   }
   
   return { isValid: true, errorMessage: "" };
 };
-
-
-
 
 export default function ParentConsentScreen({ navigation, route }: any) {
   const { ageGroup } = route.params || { ageGroup: 'Under 14' };
