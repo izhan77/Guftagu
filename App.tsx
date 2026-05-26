@@ -15,7 +15,7 @@ import SessionScreen from "./src/screens/Main/SessionScreen";
 import SessionCompleteScreen from "./src/screens/Main/SessionCompleteScreen";
 import DashboardScreen from "./src/screens/Main/DashboardScreen";
 import ParentPortalScreen from "./src/screens/Parent/ParentPortalScreen";
-// import ParentDashboardScreen from "./src/screens/Parent/ParentDashboardScreen";
+import ParentDashboardScreen from "./src/screens/Parent/ParentDashboardScreen";
 
 const Stack = createStackNavigator();
 
@@ -59,7 +59,7 @@ export default function App() {
         />
         <Stack.Screen name="Dashboard" component={DashboardScreen} />
         <Stack.Screen name="ParentPortal" component={ParentPortalScreen} />
-        {/* <Stack.Screen name="ParentDashboard" component={ParentDashboardScreen} /> */}
+        <Stack.Screen name="ParentDashboard" component={ParentDashboardScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
