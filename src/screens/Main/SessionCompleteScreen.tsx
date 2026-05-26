@@ -59,11 +59,13 @@ export default function SessionCompleteScreen({ navigation, route }: any) {
   const [leveledUp, setLeveledUp] = useState(false);
   const [displayScore, setDisplayScore] = useState(0);
 
-  // ── Thinking video player (loops silently, just like idle in SessionScreen) ──
+  // ── Thinking video player: starts immediately on mount so it's buffered ──
+  // by the time the screen appears, avoiding any first-frame black flash.
   const thinkingPlayer = useVideoPlayer(cfg.thinking, (p) => {
-    p.loop = true;
-    p.muted = true;
-    p.play();
+    p.loop            = true;
+    p.muted           = true;
+    p.playbackRate    = 1;
+    p.play(); // start buffering + playing immediately
   });
 
   // ── Animations ──
@@ -114,20 +116,23 @@ export default function SessionCompleteScreen({ navigation, route }: any) {
         setNewScore(calculateSessionScore(exchangeScores));
       }
 
-      // Hold the calculating screen for 2.8s, then crossfade to result
+      // Hold the calculating screen for 2.8s, then crossfade to result.
+      // Video stays mounted & playing through the crossfade — no black frame ever.
       setTimeout(() => {
-        // Stop thinking video cleanly
-        try { thinkingPlayer.pause(); } catch (_) {}
+        setPhase("result"); // flip phase immediately so result layer becomes interactive
 
-        Animated.timing(calcFade, { toValue: 0, duration: 350, useNativeDriver: true }).start(() => {
-          setPhase("result");
-          Animated.parallel([
-            Animated.spring(cardSlide,   { toValue: 0, tension: 55, friction: 10, useNativeDriver: true }),
-            Animated.timing(cardOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
-          ]).start();
-          scoreCount.addListener(({ value }) => setDisplayScore(Math.round(value)));
-          Animated.timing(scoreCount, { toValue: newScore, duration: 1100, useNativeDriver: false }).start();
+        // Fade video layer OUT and result layer IN simultaneously — perfect crossfade
+        Animated.parallel([
+          Animated.timing(calcFade,    { toValue: 0, duration: 400, useNativeDriver: true }),
+          Animated.timing(cardOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.spring(cardSlide,   { toValue: 0, tension: 55, friction: 10, useNativeDriver: true }),
+        ]).start(() => {
+          // Only pause video AFTER it's fully hidden — never mid-frame
+          try { thinkingPlayer.pause(); } catch (_) {}
         });
+
+        scoreCount.addListener(({ value }) => setDisplayScore(Math.round(value)));
+        Animated.timing(scoreCount, { toValue: newScore, duration: 1100, useNativeDriver: false }).start();
       }, 2800);
     };
     run();
@@ -139,16 +144,20 @@ export default function SessionCompleteScreen({ navigation, route }: any) {
   // ════════════════════════════════════════════════
   // CALCULATING PHASE — mirrors SessionScreen layout
   // ════════════════════════════════════════════════
-  if (phase === "calculating") {
-    return (
-      <Animated.View style={[styles.calcRoot, { opacity: calcFade }]}>
+  // ════════════════════════════════════════════════
+  // SINGLE RENDER TREE — no unmount = no black flash
+  // Video layer always stays mounted; result card
+  // fades in ON TOP without ever removing the video.
+  // ════════════════════════════════════════════════
+  return (
+    <View style={styles.root}>
 
-        {/* ── TOP: Character video section (exact same structure as SessionScreen) ── */}
+      {/* ── VIDEO LAYER: always mounted, fades out when result appears ── */}
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: calcFade }]}>
         <LinearGradient
           colors={[cfg.gradientTop, cfg.gradientBottom]}
           style={styles.characterSection}
         >
-          {/* Looping thinking video fills the whole section */}
           <VideoView
             player={thinkingPlayer}
             style={StyleSheet.absoluteFill}
@@ -156,8 +165,6 @@ export default function SessionCompleteScreen({ navigation, route }: any) {
             nativeControls={false}
             surfaceType="textureView"
           />
-
-          {/* Bottom gradient mask fades character feet into background — same as SessionScreen */}
           <LinearGradient
             colors={["transparent", cfg.gradientBottom + "CC", cfg.gradientBottom]}
             style={styles.characterBottomMask}
@@ -166,26 +173,18 @@ export default function SessionCompleteScreen({ navigation, route }: any) {
           />
         </LinearGradient>
 
-        {/* ── BOTTOM: Calculating text panel (same bg as gradient bottom) ── */}
         <LinearGradient
           colors={[cfg.gradientBottom, "#FFFFFF"]}
           style={styles.calcBottomSection}
         >
           <SafeAreaView edges={["bottom"]} style={styles.calcBottomInner}>
-
-            {/* Animated thinking label */}
             <Animated.View style={[styles.thinkingBadge, { backgroundColor: themeColor + "18", opacity: dotAnim.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) }]}>
               <Text style={[styles.thinkingBadgeText, { color: themeColor }]}>
-                🤔 {character?.name || "Your buddy"} is reviewing...
+                {character?.name || "Your buddy"} is reviewing...
               </Text>
             </Animated.View>
-
             <Text style={styles.calcTitle}>Calculating your score</Text>
-            <Text style={styles.calcSubtitle}>
-              Reviewing everything you said ✨
-            </Text>
-
-            {/* Animated progress dots */}
+            <Text style={styles.calcSubtitle}>Reviewing everything you said ✨</Text>
             <View style={styles.dotsRow}>
               {[0, 1, 2].map((i) => (
                 <Animated.View
@@ -209,83 +208,72 @@ export default function SessionCompleteScreen({ navigation, route }: any) {
                 />
               ))}
             </View>
-
           </SafeAreaView>
         </LinearGradient>
-
       </Animated.View>
-    );
-  }
 
-  // ════════════════════════════════════════════════
-  // RESULT PHASE
-  // ════════════════════════════════════════════════
-  return (
-    <LinearGradient colors={["#EEE6FF", "#E8F4FD"]} style={styles.root}>
-      <SafeAreaView style={styles.safe}>
-        <Animated.View style={[
-          styles.resultCard,
-          { transform: [{ translateY: cardSlide }], opacity: cardOpacity }
-        ]}>
-
-          {leveledUp && (
-            <View style={[styles.levelUpBadge, { backgroundColor: themeColor }]}>
-              <Text style={styles.levelUpText}>🎉 Level Up! {level.emoji}</Text>
-            </View>
-          )}
-
-          <Text style={styles.wellDone}>Thank you, {childName}! 🎉</Text>
-
-          {/* Score circle */}
-          <View style={[styles.scoreRing, { borderTopColor: themeColor, borderRightColor: themeColor }]}>
-            <Text style={[styles.scoreNumber, { color: themeColor }]}>{displayScore}</Text>
-            <Text style={styles.scoreLabel}>confidence</Text>
-          </View>
-
-          <Text style={[styles.levelName, { color: level.color }]}>
-            {level.emoji} {level.level}
-          </Text>
-
-          <View style={styles.statsRow}>
-            {[
-              { icon: "🗣️", val: `${exchangeScores.length}`, label: "Rounds"   },
-              { icon: "📈", val: `+${Math.max(0, newScore - oldScore)}`, label: "Progress" },
-              { icon: "💡", val: `${Math.round(sessionScore)}`,           label: "Session"  },
-            ].map((s, i) => (
-              <View key={i} style={[styles.statCard, { borderColor: themeColor + "30" }]}>
-                <Text style={styles.statIcon}>{s.icon}</Text>
-                <Text style={[styles.statVal, { color: themeColor }]}>{s.val}</Text>
-                <Text style={styles.statLbl}>{s.label}</Text>
+      {/* ── RESULT LAYER: fades in on top, result bg covers video smoothly ── */}
+      <Animated.View
+        style={[StyleSheet.absoluteFill, { opacity: cardOpacity }]}
+        pointerEvents={phase === "result" ? "auto" : "none"}
+      >
+        <LinearGradient colors={["#EEE6FF", "#E8F4FD"]} style={StyleSheet.absoluteFill} />
+        <SafeAreaView style={styles.safe}>
+          <Animated.View style={[
+            styles.resultCard,
+            { transform: [{ translateY: cardSlide }], opacity: cardOpacity }
+          ]}>
+            {leveledUp && (
+              <View style={[styles.levelUpBadge, { backgroundColor: themeColor }]}>
+                <Text style={styles.levelUpText}>🎉 Level Up! {level.emoji}</Text>
               </View>
-            ))}
-          </View>
-
-          {sessionTip ? (
-            <View style={styles.tipCard}>
-              <Text style={styles.tipTitle}>💬 Speaking Tip</Text>
-              <Text style={styles.tipText}>{sessionTip}</Text>
+            )}
+            <Text style={styles.wellDone}>Thank you, {childName}! 🎉</Text>
+            <View style={[styles.scoreRing, { borderTopColor: themeColor, borderRightColor: themeColor }]}>
+              <Text style={[styles.scoreNumber, { color: themeColor }]}>{displayScore}</Text>
+              <Text style={styles.scoreLabel}>confidence</Text>
             </View>
-          ) : null}
+            <Text style={[styles.levelName, { color: level.color }]}>
+              {level.emoji} {level.level}
+            </Text>
+            <View style={styles.statsRow}>
+              {[
+                { icon: "🗣️", val: `${exchangeScores.length}`, label: "Rounds"   },
+                { icon: "📈", val: `+${Math.max(0, newScore - oldScore)}`, label: "Progress" },
+                { icon: "💡", val: `${Math.round(sessionScore)}`,           label: "Session"  },
+              ].map((s, i) => (
+                <View key={i} style={[styles.statCard, { borderColor: themeColor + "30" }]}>
+                  <Text style={styles.statIcon}>{s.icon}</Text>
+                  <Text style={[styles.statVal, { color: themeColor }]}>{s.val}</Text>
+                  <Text style={styles.statLbl}>{s.label}</Text>
+                </View>
+              ))}
+            </View>
+            {sessionTip ? (
+              <View style={styles.tipCard}>
+                <Text style={styles.tipTitle}>Speaking Tip</Text>
+                <Text style={styles.tipText}>{sessionTip}</Text>
+              </View>
+            ) : null}
+            <TouchableOpacity
+              style={[styles.primaryBtn, { backgroundColor: themeColor }]}
+              onPress={() => navigation.navigate("Dashboard")}
+            >
+              <Text style={styles.primaryBtnText}>See My Dashboard</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.secondaryBtn, { borderColor: themeColor }]}
+              onPress={() => navigation.replace("CharacterSelect", {
+                name: childName, ageGroup: "10-14", fromOnboarding: false,
+              })}
+            >
+              <Text style={[styles.secondaryBtnText, { color: themeColor }]}>Talk Again</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </SafeAreaView>
+      </Animated.View>
 
-          <TouchableOpacity
-            style={[styles.primaryBtn, { backgroundColor: themeColor }]}
-            onPress={() => navigation.navigate("Dashboard")}
-          >
-            <Text style={styles.primaryBtnText}>See My Dashboard</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.secondaryBtn, { borderColor: themeColor }]}
-            onPress={() => navigation.replace("CharacterSelect", {
-              name: childName, ageGroup: "10-14", fromOnboarding: false,
-            })}
-          >
-            <Text style={[styles.secondaryBtnText, { color: themeColor }]}>Talk Again</Text>
-          </TouchableOpacity>
-
-        </Animated.View>
-      </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 
