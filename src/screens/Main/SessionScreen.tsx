@@ -317,7 +317,6 @@ export default function SessionScreen({ navigation, route }: any) {
         </View>
       </LinearGradient>
 
-      // Add this near the bottom, after mic button or inside bottomSection
 <TouchableOpacity
   style={styles.testCompleteBtn}
   onPress={() => navigation.navigate("SessionComplete", {
