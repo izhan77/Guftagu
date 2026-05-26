@@ -33,22 +33,22 @@ const CHAR_CONFIG: Record<
   }
 > = {
   zara: {
-    idle: require("../../../assets/videos/zara/zara_idle.mov"),
-    talking: require("../../../assets/videos/zara/zara_talking.mov"),
+    idle: require("../../../assets/videos/zara/zara_idle.mp4"),
+    talking: require("../../../assets/videos/zara/zara_talking.mp4"),
     gradientTop: "#F4EDFF",
     gradientBottom: "#E0D4FF",
     buttonColor: "#7C5CBF",
   },
   robo: {
-    idle: require("../../../assets/videos/robo_bhaya/robo_idle.mov"),
-    talking: require("../../../assets/videos/robo_bhaya/robo_talking.mov"),
+    idle: require("../../../assets/videos/robo_bhaya/robo_idle.mp4"),
+    talking: require("../../../assets/videos/robo_bhaya/robo_talking.mp4"),
     gradientTop: "#E8F4FD",
     gradientBottom: "#BBDEFB",
     buttonColor: "#2196F3",
   },
   ustad: {
-    idle: require("../../../assets/videos/ustad_sahab/ustad_idle.mov"),
-    talking: require("../../../assets/videos/ustad_sahab/ustad_talking.mov"),
+    idle: require("../../../assets/videos/ustad_sahab/ustad_idle.mp4"),
+    talking: require("../../../assets/videos/ustad_sahab/ustad_talking.mp4"),
     gradientTop: "#EAF7EE",
     gradientBottom: "#C8E6C9",
     buttonColor: "#4CAF50",

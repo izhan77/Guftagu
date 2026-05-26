@@ -25,17 +25,17 @@ const CHAR_CONFIG: Record<string, {
   gradientBottom: string;
 }> = {
   zara: {
-    thinking: require("../../../assets/videos/zara/zara_thinking.mov"),
+    thinking: require("../../../assets/videos/zara/zara_thinking.mp4"),
     gradientTop: "#F4EDFF",
     gradientBottom: "#E0D4FF",
   },
   robo: {
-    thinking: require("../../../assets/videos/robo_bhaya/robo_thinking.mov"),
+    thinking: require("../../../assets/videos/robo_bhaya/robo_thinking.mp4"),
     gradientTop: "#F4EDFF",
     gradientBottom: "#E0D4FF",
   },
   ustad: {
-    thinking: require("../../../assets/videos/ustad_sahab/ustad_thinking.mov"),
+    thinking: require("../../../assets/videos/ustad_sahab/ustad_thinking.mp4"),
     gradientTop: "#F4EDFF",
     gradientBottom: "#E0D4FF",
   },
