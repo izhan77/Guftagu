@@ -693,12 +693,12 @@ const cc = StyleSheet.create({
   name: { fontSize: 18, fontFamily: "Poppins-ExtraBold", color: "#1A1A2E" },
   agePill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99 },
   agePillText: { fontSize: 11, fontFamily: "Poppins-Bold" },
-  lastSession: { fontSize: 11, fontFamily: "Poppins-Medium", color: "#AAAAAA", marginBottom: 2 },
+  lastSession: { fontSize: 11, fontFamily: "Poppins-Medium", color: "#6e6d6d", marginBottom: 2 },
   charLabel:   { fontSize: 12, fontFamily: "Poppins-Bold" },
-  sessCount:   { fontSize: 11, fontFamily: "Poppins-Medium", color: "#BBBBBB" },
+  sessCount:   { fontSize: 11, fontFamily: "Poppins-Medium", color: "#6e6d6d" },
   scoreWrap:   { alignItems: "center", marginLeft: 8 },
   scoreNum:    { fontSize: 32, fontFamily: "Poppins-ExtraBold" },
-  scoreSubLabel: { fontSize: 10, fontFamily: "Poppins-Medium", color: "#BBBBBB" },
+  scoreSubLabel: { fontSize: 10, fontFamily: "Poppins-Medium", color: "#6e6d6d" },
   barTrack: { height: 8, backgroundColor: "#F0EFF7", borderRadius: 4, overflow: "hidden", marginBottom: 12 },
   barFill:  { height: "100%", borderRadius: 4 },
   footer:   { flexDirection: "row", alignItems: "center", gap: 8 },
@@ -707,7 +707,7 @@ const cc = StyleSheet.create({
   trendPill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 99 },
   trendText: { fontSize: 11, fontFamily: "Poppins-Bold" },
   tapHint:   { flexDirection: "row", alignItems: "center", gap: 2, marginLeft: "auto" },
-  tapHintText: { fontSize: 11, fontFamily: "Poppins-Medium", color: "#BBBBBB" },
+  tapHintText: { fontSize: 11, fontFamily: "Poppins-Medium", color: "#6e6d6d" },
   streakBadge: { position: "absolute", top: 12, right: 12, backgroundColor: "rgba(255,149,0,0.12)", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99 },
   streakBadgeText: { fontSize: 11, fontFamily: "Poppins-Bold", color: "#FF9500" },
 });
@@ -757,16 +757,15 @@ export default function ParentDashboardScreen({ navigation }: any) {
             <View style={ms.blobTR} /><View style={ms.blobBL} />
 
             <SafeAreaView>
-              {/* Nav row */} 
+              {/* Nav row - fixed responsive layout */}
               <View style={ms.navRow}>
                 <TouchableOpacity style={ms.backBtn} onPress={() => navigation.goBack()}>
                   <Ionicons name="chevron-back" size={24} color="white" />
                 </TouchableOpacity>
-                <View style={{ display: "flex", justifyContent: "flex-end", alignItems: "flex-end" }}>
+                <View style={ms.headerTextContainer}>
                   <Text style={ms.heroTitle}>Parent Dashboard</Text>
                   <Text style={ms.heroSub}>{children.length} child{children.length !== 1 ? "ren" : ""} linked</Text>
                 </View>
-                <View style={{ width: 44 }} />
               </View>
               {/* Summary strip — same pattern as child dashboard stats row */}
               <View style={ms.summaryStrip}>
@@ -864,37 +863,53 @@ const ms = StyleSheet.create({
   blobTR: { position: "absolute", top: -40, right: -40, width: 160, height: 160, borderRadius: 80, backgroundColor: "rgba(255,255,255,0.1)" },
   blobBL: { position: "absolute", bottom: -20, left: -20, width: 120, height: 120, borderRadius: 60, backgroundColor: "rgba(255,255,255,0.08)" },
 
-  navRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 20, marginBottom: 18, marginRight: -84 },
+  navRow: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    justifyContent: "space-between", 
+    paddingTop: 20, 
+    marginBottom: 18,
+  },
   backBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" },
-  heroTitle: { fontSize: 25, fontFamily: "Poppins-ExtraBold", color: "white" },
-  heroSub:   { fontSize: 12, fontFamily: "Poppins-Medium", color: "rgba(255,255,255,0.75)", marginTop: 2 },
+  headerTextContainer: {
+    flex: 1,
+    alignItems: "flex-end",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  heroTitle: { 
+    fontSize: 24, 
+    fontFamily: "Poppins-ExtraBold", 
+    color: "white",
+    textAlign: "right",
+  },
+  heroSub: {   
+    fontSize: 16,  // increased from 12
+    fontFamily: "Poppins-Medium", 
+    color: "rgba(255,255,255,0.85)",  // made brighter
+    marginTop: 2,
+    textAlign: "right",
+  },
 
   summaryStrip: { flexDirection: "row", backgroundColor: "rgba(255,255,255,0.18)", borderRadius: 22, paddingVertical: 16, paddingHorizontal: 4 },
   summaryItem:  { flex: 1, alignItems: "center" },
-  summaryEmoji: { fontSize: 22, marginBottom: 3 },
-  summaryVal:   { fontSize: 22, fontFamily: "Poppins-ExtraBold", color: "white" },
-  summaryLabel: { fontSize: 10, fontFamily: "Poppins-SemiBold", color: "rgba(255,255,255,0.8)", marginTop: 2 },
+  summaryEmoji: { fontSize: 24, marginBottom: 3 },
+  summaryVal:   { fontSize: 24, fontFamily: "Poppins-ExtraBold", color: "white" },
+  summaryLabel: { fontSize: 11, fontFamily: "Poppins-SemiBold", color: "rgba(255,255,255,0.85)", marginTop: 2 },  // brighter
 
-  // Stat cards — same as child dashboard
-  statsRow: { flexDirection: "row", marginHorizontal: 16, marginTop: 16, gap: 10 },
-  statCard:  { flex: 1, borderRadius: 22, paddingVertical: 16, alignItems: "center", elevation: 6, shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 8 },
-  statEmoji: { fontSize: 26, marginBottom: 4 },
-  statValue: { fontSize: 26, fontFamily: "Poppins-ExtraBold", color: "white" },
-  statLabel: { fontSize: 11, fontFamily: "Poppins-SemiBold", color: "rgba(255,255,255,0.85)", marginTop: 2 },
-
-  sectionTitle: { fontSize: 20, fontFamily: "Poppins-ExtraBold", color: "#1A1A2E" },
-  sectionSub:   { fontSize: 12, fontFamily: "Poppins-Medium", color: "#8A8A8A", marginTop: 4 },
+  sectionTitle: { fontSize: 22, fontFamily: "Poppins-ExtraBold", color: "#1A1A2E" },  // larger and darker
+  sectionSub:   { fontSize: 13, fontFamily: "Poppins-Medium", color: "#444444", marginTop: 4 },  // darker and larger
 
   emptyState: { alignItems: "center", paddingVertical: 60, paddingHorizontal: 40 },
-  emptyTitle: { fontSize: 20, fontFamily: "Poppins-ExtraBold", color: "#1A1A2E", marginBottom: 8 },
-  emptySub:   { fontSize: 14, fontFamily: "Poppins-Medium", color: "#AAAAAA", textAlign: "center" },
+  emptyTitle: { fontSize: 22, fontFamily: "Poppins-ExtraBold", color: "#1A1A2E", marginBottom: 8 },  // larger
+  emptySub:   { fontSize: 15, fontFamily: "Poppins-Medium", color: "#555555", textAlign: "center" },  // larger and darker
 
   // Safety — white card
   safetyCard: { flexDirection: "row", alignItems: "flex-start", gap: 14, backgroundColor: "white", borderRadius: 26, padding: 18, marginHorizontal: 16, marginTop: 8, elevation: 4, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 10 },
   safetyIconWrap: { width: 52, height: 52, borderRadius: 26, backgroundColor: "#EDE8FF", alignItems: "center", justifyContent: "center" },
-  safetyTitle: { fontSize: 14, fontFamily: "Poppins-ExtraBold", color: "#1A1A2E", marginBottom: 4 },
-  safetyText:  { fontSize: 12, fontFamily: "Poppins-Medium", color: "#8A8A8A", lineHeight: 18 },
+  safetyTitle: { fontSize: 16, fontFamily: "Poppins-ExtraBold", color: "#1A1A2E", marginBottom: 4 },  // larger and darker
+  safetyText:  { fontSize: 13, fontFamily: "Poppins-Medium", color: "#444444", lineHeight: 20 },  // larger and darker
 
   deleteAllBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginHorizontal: 16, marginTop: 16, paddingVertical: 16, borderRadius: 18, borderWidth: 2, borderColor: "rgba(255,59,48,0.3)", backgroundColor: "rgba(255,59,48,0.06)" },
-  deleteAllText: { fontSize: 14, fontFamily: "Poppins-SemiBold", color: "#FF3B30" },
+  deleteAllText: { fontSize: 15, fontFamily: "Poppins-SemiBold", color: "#FF3B30" },  // larger
 });
