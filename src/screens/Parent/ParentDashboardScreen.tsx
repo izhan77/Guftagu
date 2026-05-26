@@ -354,7 +354,7 @@ const conf = StyleSheet.create({
   btnRow:  { flexDirection: "row", gap: 12, width: "100%" },
   cancelBtn:  { flex: 1, paddingVertical: 14, borderRadius: 16, borderWidth: 2, borderColor: "#EEEEEE", alignItems: "center" },
   cancelText: { fontSize: 14, fontFamily: "Poppins-Bold", color: "#777777" },
-  confirmBtn: { flex: 1, paddingVertical: 14, borderRadius: 16, alignItems: "center" },
+  confirmBtn: { flex: 1, paddingVertical: 14, paddingHorizontal: 18, borderRadius: 16, alignItems: "center" },
   confirmText:{ fontSize: 14, fontFamily: "Poppins-Bold", color: "white" },
 });
 
@@ -674,13 +674,6 @@ function ChildCard({ child, index, onPress }: { child: any; index: number; onPre
               <Ionicons name="chevron-forward" size={12} color="#BBBBBB" />
             </View>
           </View>
-
-          {/* Streak badge */}
-          {child.sessionStreak >= 3 && (
-            <View style={cc.streakBadge}>
-              <Text style={cc.streakBadgeText}>🔥 {child.sessionStreak}</Text>
-            </View>
-          )}
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -764,18 +757,17 @@ export default function ParentDashboardScreen({ navigation }: any) {
             <View style={ms.blobTR} /><View style={ms.blobBL} />
 
             <SafeAreaView>
-              {/* Nav row */}
+              {/* Nav row */} 
               <View style={ms.navRow}>
                 <TouchableOpacity style={ms.backBtn} onPress={() => navigation.goBack()}>
                   <Ionicons name="chevron-back" size={24} color="white" />
                 </TouchableOpacity>
-                <View style={{ flex: 1, alignItems: "center" }}>
+                <View style={{ display: "flex", justifyContent: "flex-end", alignItems: "flex-end" }}>
                   <Text style={ms.heroTitle}>Parent Dashboard</Text>
                   <Text style={ms.heroSub}>{children.length} child{children.length !== 1 ? "ren" : ""} linked</Text>
                 </View>
                 <View style={{ width: 44 }} />
               </View>
-
               {/* Summary strip — same pattern as child dashboard stats row */}
               <View style={ms.summaryStrip}>
                 {[
@@ -793,24 +785,6 @@ export default function ParentDashboardScreen({ navigation }: any) {
               </View>
             </SafeAreaView>
           </LinearGradient>
-        </Animated.View>
-
-        {/* ══ STAT CARDS — same 3-card grid as child dashboard ══ */}
-        <Animated.View style={[ms.statsRow, {
-          opacity: statsAnim,
-          transform: [{ scale: statsAnim.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }],
-        }]}>
-          {[
-            { emoji: "🎯", value: avgScore,       label: "Avg Score",  grad: ["#7C5CBF","#5A3D9A"] as [string,string] },
-            { emoji: "🔥", value: totalStreak,    label: "Day Streaks",grad: ["#FF6B6B","#EE4444"] as [string,string] },
-            { emoji: "🎙️",value: totalSessions,  label: "Sessions",   grad: ["#00C9B8","#00A3A3"] as [string,string] },
-          ].map((s, i) => (
-            <LinearGradient key={i} colors={s.grad} style={ms.statCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-              <Text style={ms.statEmoji}>{s.emoji}</Text>
-              <Text style={ms.statValue}>{s.value}</Text>
-              <Text style={ms.statLabel}>{s.label}</Text>
-            </LinearGradient>
-          ))}
         </Animated.View>
 
         {/* ══ SECTION TITLE ══ */}
@@ -890,9 +864,9 @@ const ms = StyleSheet.create({
   blobTR: { position: "absolute", top: -40, right: -40, width: 160, height: 160, borderRadius: 80, backgroundColor: "rgba(255,255,255,0.1)" },
   blobBL: { position: "absolute", bottom: -20, left: -20, width: 120, height: 120, borderRadius: 60, backgroundColor: "rgba(255,255,255,0.08)" },
 
-  navRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 10, marginBottom: 18 },
+  navRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 20, marginBottom: 18, marginRight: -84 },
   backBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" },
-  heroTitle: { fontSize: 18, fontFamily: "Poppins-ExtraBold", color: "white" },
+  heroTitle: { fontSize: 25, fontFamily: "Poppins-ExtraBold", color: "white" },
   heroSub:   { fontSize: 12, fontFamily: "Poppins-Medium", color: "rgba(255,255,255,0.75)", marginTop: 2 },
 
   summaryStrip: { flexDirection: "row", backgroundColor: "rgba(255,255,255,0.18)", borderRadius: 22, paddingVertical: 16, paddingHorizontal: 4 },
