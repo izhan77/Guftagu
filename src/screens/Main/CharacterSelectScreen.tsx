@@ -78,6 +78,7 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
   const current = CHARACTERS[index];
 
   // Continuous Floating Animation
+  // Animates the character image up and down in a smooth loop
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
