@@ -156,9 +156,9 @@ JAWAB DO: pehle genuinely react karo jo unhone kaha us pe, phir tip naturally do
 
 function getFallback(characterId: string): string {
   const f: Record<string, string> = {
-    zara:  "Yaar acha tha! Thoda slow bolo next time. Ab batao — school mein kya scene hai?",
+    zara:  "Yaar acha tha! Thoda slow bolo next time. Ab batao school mein kya scene hai?",
     robo:  "BEEP BOOP! Good signal! Next: breathe before speaking! What is your favorite subject?",
-    ustad: "Beta, acha kaha. Thoda aahista bolo. Ab batao — ghar mein sab theek hai?",
+    ustad: "Beta, acha kaha. Thoda aahista bolo. Ab batao ghar mein sab theek hai?",
   }
   return f[characterId] || f.zara
 }
