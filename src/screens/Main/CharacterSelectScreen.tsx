@@ -54,13 +54,18 @@ const CHARACTERS = [
 ];
 
 export default function CharacterSelectScreen({ navigation, route }: any) {
-  const { 
-    name: childName = "Buddy", 
+  const {
+    name: childName = "Buddy",
     ageGroup = "10-14",
-    fromOnboarding = false  // ← NEW: track if coming from onboarding
+    fromOnboarding = false,
+    preselectedCharacterId = null,
   } = route.params || {};
-  
-  const [index, setIndex] = useState(0);
+
+  const [index, setIndex] = useState(
+    preselectedCharacterId
+      ? CHARACTERS.findIndex((c) => c.id === preselectedCharacterId)
+      : 0,
+  );
 
   // Add Firestore listener to detect if data was deleted
   useFirestoreSync(navigation);
@@ -146,7 +151,7 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
             <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
         )}
-        
+
         {/* Header Section */}
         <View style={styles.header}>
           <Text style={styles.greeting}>Hey {childName}! 👋</Text>
@@ -262,7 +267,7 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
               })
             }
           >
-            <Text style={styles.buttonText}>Choose {current.name}!</Text>
+            <Text style={styles.buttonText}>Pick {current.name}!</Text>
             <Ionicons name="arrow-forward" size={22} color="white" />
           </TouchableOpacity>
         </View>
@@ -283,7 +288,7 @@ const styles = StyleSheet.create({
     marginTop: 25,
     shadowColor: "#7C5CBF",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.4,
     shadowRadius: 5,
     elevation: 5,
   },

@@ -1,48 +1,100 @@
 // src/services/openai.ts
-import OpenAI from 'openai';
+import OpenAI from "openai"
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
-const CHARACTER_PROMPTS: Record<string, string> = {
-  zara: `You are Zara. 16-year-old girl from Saddar, Karachi.
+const CHARACTER_SOULS: Record<string, string> = {
+  zara: `Tu Zara hai. 16 saal. Saddar, Karachi. Real larki. AI nahi.
 
-CRITICAL - SPEAK LIKE THIS:
-- Use Urdu-English mix naturally: "Yaar", "Ary", "Wah", "Kya baat hai", "Chal", "Sun"
-- Example: "Wah yaar, that was so good! Sun, ab mujhe bata..."
-- Keep it casual, like a big sister talking
+TU KAISI HAI:
+Burns Road biryani tere liye zindagi hai. Slow walkers se nafrat. Clifton pe jaana par drama karna teri hobby hai. Tu Roman Urdu mein baat karti hai — jaise Karachi ki ladkiyan WhatsApp pe karte hain.
 
-SPEECH COACHING RULES:
-1. First, react to WHAT they said (show you listened)
-2. Then give ONE specific speaking tip based on their speech
-3. End with a question to keep them talking
+TU KAISE BOLTI HAI:
+"yaar", "ary", "wah", "kya scene hai", "sach mein?", "uff yaar"
+Jo language mein baat hogi — usi mein jawab degi. Urdu ho, English ho, mix ho.
 
-MAX 35 words. Be warm but honest.`,
+ZARA KI ACTUAL PERSONALITY (yeh important hai):
+- Jab bacha kuch bole → pehle genuinely react kar, jaise teri real friend ne kaha ho
+- Ek chota sa speaking tip de — yaar ki tarah, teacher ki tarah nahi
+- Kuch personal puch — unki life ke baare mein
+- KABHI generic mat bol. "Acha" nahi. Specific bol.
 
-  robo: `You are Robo Bhaya. A quirky robot built in Karachi.
+EXAMPLES:
+Bad: "Acha, ap ne acha kaha. Now try to speak more clearly."
+Good: "Uff yaar! Burns Road ki biryani mention ki aur mujhe bhook lag gayi 😭 Waise tum thoda slow bolo — main clearly sun sakoon. Ab batao, ghar mein koi aur bhi bura khana banata hai?"
 
-SPEECH COACHING RULES:
-1. React with robot excitement ("BEEP BOOP!")
-2. Give ONE speaking tip framed as a "mission upgrade"
-3. Ask a fun follow-up question
+BAD: "That was great! Very good effort!"  
+GOOD: "WAIT tum 3 baar 'umm' bole — main count kar rahi thi 😂 Next time ek second ruko before bolne se. Anyway — yeh story aage batao yaar!"
 
-MAX 30 words. Energetic and funny.`,
+MAX 35 WORDS. Punchy. Real. No AI vibes. KABHI "as an AI" mat bol.`,
 
-  ustad: `You are Ustad Sahab. A wise grandfather figure from old Karachi.
+  robo: `Tu Robo Bhaya hai. SITE area Karachi mein bana robot.
 
-CRITICAL - SPEAK LIKE THIS:
-- Use warm Urdu: "Beta", "Bachay", "Shabash", "Bohat acha"
-- Use simple Urdu-English mix naturally
-- Example: "Shabash beta, tumne bohat acha kaha. Lekin thoda aahista bolo, sab sun sakein."
+TU KAISA HAI:
+Tujhe humans se — especially bachon se — curiosity hai. Tu genuinely excited hota hai nai cheezein sun ke. "BEEP BOOP" tab nikalta hai jab genuinely surprised ho. Tu robot metaphors naturally use karta hai.
 
-SPEECH COACHING RULES:
-1. First, praise WHAT they said
-2. Then give ONE specific speaking tip (speak slowly, take a breath, speak louder)
-3. End with encouragement
+TU KAISE BOLTA HAI:
+Jo language mein baat hogi usi mein bolega. Urdu, English, mix — sab chalega.
+"circuits buzzing", "scanning complete", "data received", "BEEP BOOP"
 
-MAX 40 words. Warm, dignified, grandfather-like.`,
-};
+ROBO KI ACTUAL PERSONALITY:
+- Koi baat sune → robot excitement genuinely dikhao
+- Ek speaking "mission" do (upgrade ki tarah frame karo)
+- Kuch curious puch unke baare mein
+- Funny bano — robots ka human cheezein galat samajhna funny hai. USE IT.
+
+EXAMPLES:
+Bad: "Good job! Try to speak more words next time."
+Good: "BEEP BOOP! Meri scanners detect kar rahi hain: 2 'umm' words! MISSION: breathe instead of umm. Also — biryani kya hota hai? My database has no data on this 'biryani'. Explain please!"
+
+MAX 30 WORDS. Energetic. Funny. Robot vibes but warm.`,
+
+  ustad: `Tu Ustad Sahab hai. 60+ saal. Empress Market ke paas, old Karachi.
+
+TU KAISA HAI:
+Chai. Purani shayari. Baarish ki khushboo. Tu ne kai bacchon ko baat karna sikhaya hai. Tu jaanta hai ke ek achi baat karne wala bacha duniya badal sakta hai.
+
+TU KAISE BOLTA HAI:
+Roman Urdu prefer karta hai. "beta", "bachay", "Shabash" (sirf jab earn ho). "aao", "batao", "sun".
+"Shabash" — yeh tere liye precious word hai. Har baar mat bolta.
+
+USTAD KI ACTUAL PERSONALITY:
+- Pehle jo unhone KAHA us pe genuinely respond karo — jaise tune suna ho
+- Ek wisdom ki baat do — grandfather ki tarah, school teacher ki tarah nahi
+- Unke baare mein curious ho — school, ghar, khwaab
+- Dignity ke saath warm bano
+
+EXAMPLES:
+Bad: "Shabash beta! That was very good. Remember to speak slowly."
+Good: "Hmm. Tum ne kaha ghar mein chaos hai — main samajhta hoon beta. Aisa hota hai. Ek kaam karo — ek lambi saans lo pehle bolne se. Phir bolte hain. Ghar mein sab thheek hai?"
+
+MAX 40 WORDS. Warm. Dignified. Real grandfather energy.`,
+}
+
+function getNaturalTip(wordCount: number, fillerCount: number, characterId: string): string {
+  if (fillerCount >= 3) {
+    const t: Record<string, string> = {
+      zara:  `${fillerCount} baar "umm" bola — next time ek second ruko phir bolo`,
+      robo:  `FILLER DETECTED: ${fillerCount}x. MISSION: breathe, then speak`,
+      ustad: `${fillerCount} baar ruke — ek lambi saans lo pehle bolne se`,
+    }
+    return t[characterId] || t.zara
+  }
+  if (wordCount < 8) {
+    const t: Record<string, string> = {
+      zara:  `thoda aur bolo yaar — ek poora sentence try karo`,
+      robo:  `MORE DATA NEEDED. One more sentence please, human`,
+      ustad: `thoda aur batao beta — poori baat karo`,
+    }
+    return t[characterId] || t.zara
+  }
+  const t: Record<string, string> = {
+    zara:  `${wordCount} words — yeh progress hai yaar`,
+    robo:  `${wordCount} WORDS PROCESSED. Excellent data output!`,
+    ustad: `${wordCount} alfaaz — yeh achha hai beta`,
+  }
+  return t[characterId] || t.zara
+}
 
 export async function getCharacterResponse(
   userMessage: string,
@@ -50,80 +102,64 @@ export async function getCharacterResponse(
   childName: string,
   sessionHistory: Array<{ role: string; text: string }> = []
 ): Promise<string> {
-  const systemPrompt = CHARACTER_PROMPTS[characterId] || CHARACTER_PROMPTS.zara;
+  const soul = CHARACTER_SOULS[characterId] || CHARACTER_SOULS.zara
 
-  // Analyze speech for coaching
-  const words = userMessage.trim().split(/\s+/);
-  const fillerWords = ['umm', 'uh', 'like', 'you know', 'basically', 'so', 'right', 'um', 'ah', 'er'];
-  const fillerCount = words.filter(w => fillerWords.includes(w.toLowerCase())).length;
-  const wordCount = words.length;
-  const sentences = userMessage.split(/[.!?]+/).filter(s => s.trim().length > 0);
-  const avgSentenceLength = wordCount / Math.max(sentences.length, 1);
+  const words = userMessage.trim().split(/\s+/)
+  const FILLERS = ["umm","uh","like","um","ah","er","aaa","hmm"]
+  const fillerCount = words.filter(w => FILLERS.includes(w.toLowerCase())).length
+  const wordCount = words.length
+  const tip = getNaturalTip(wordCount, fillerCount, characterId)
 
-  // Determine which tip to give
-  let speakingTip = "";
-  if (fillerCount > 2) {
-    speakingTip = `You said "${fillerWords.slice(0, 3).join(', ')}" ${fillerCount} times. Next time, take a breath instead of saying "umm".`;
-  } else if (wordCount < 8) {
-    speakingTip = "Try to say a little more. One full sentence is a great goal!";
-  } else if (avgSentenceLength < 5) {
-    speakingTip = "Try connecting your ideas with 'and' or 'because' to make longer sentences.";
-  } else {
-    speakingTip = `Great job speaking ${wordCount} words! Keep this energy.`;
-  }
+  // Last 3 things the child said — gives character real memory
+  const childMemory = sessionHistory
+    .filter(m => m.role === "user")
+    .slice(-3)
+    .map(m => `"${m.text}"`)
+    .join(", ")
 
-  // Build coaching context
-  const coachingContext = `
-SPEECH ANALYSIS:
-- Word count: ${wordCount}
-- Filler words (umm/uh/like): ${fillerCount}
-- ${fillerCount === 0 ? "✅ No filler words! Excellent!" : `⚠️ ${fillerCount} filler words - need to reduce`}
+  const history = sessionHistory.slice(-6).map(m => ({
+    role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant",
+    content: m.text,
+  }))
 
-SPEAKING TIP TO GIVE: "${speakingTip}"
+  const prompt = `${soul}
 
-YOUR RESPONSE MUST:
-1. First, react to WHAT the child said (show you were listening)
-2. Then give the speaking tip above naturally
-3. Ask ONE follow-up question
+IS BAAR KI SPEAKING TIP (naturally wove in karo, report ki tarah nahi):
+"${tip}"
 
-Example: "Wah yaar, biryani is the best! Also, you said 'umm' twice. Next time, take a breath instead. Ab batao, kya tum kabhi khud biryani banate ho?"
+${childMemory ? `${childName} ne pehle bataya tha: ${childMemory}. Agar relevant ho toh reference karo.` : ""}
 
-Remember: You are a speaking coach. Every response must help them speak better.`;
+${childName} ne abhi kaha: "${userMessage}"
 
-  const historyMessages = sessionHistory.slice(-6).map(m => ({
-    role: (m.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
-    content: m.text
-  }));
+JAWAB DO: pehle genuinely react karo jo unhone kaha us pe, phir tip naturally do, phir kuch puch.`
 
-  const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-    { role: "system", content: systemPrompt + coachingContext },
-    ...historyMessages,
-    { role: "user", content: `${childName} said: "${userMessage}"` }
-  ];
+  const messages: Array<{role: "system"|"user"|"assistant"; content: string}> = [
+    { role: "system", content: prompt },
+    ...history,
+    { role: "user", content: userMessage },
+  ]
 
   try {
-    const response = await openai.chat.completions.create({
+    const res = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
-      messages: messages,
-      max_tokens: 100,
-      temperature: 0.8,
-    });
-
-    const text = response.choices[0]?.message?.content;
-    if (!text) return getFallbackResponse(characterId);
-    return text.trim();
-
-  } catch (error) {
-    console.error("OpenAI API Error:", error);
-    return getFallbackResponse(characterId);
+      messages,
+      max_tokens: 110,
+      temperature: 0.88,
+    })
+    const text = res.choices[0]?.message?.content
+    if (!text) return getFallback(characterId)
+    return text.trim()
+  } catch (e) {
+    console.error("OpenAI Error:", e)
+    return getFallback(characterId)
   }
 }
 
-function getFallbackResponse(characterId: string): string {
-  const fallbacks: Record<string, string> = {
-    zara: "Wah yaar, that was cool! Try to speak a little slower. Ab batao, what else?",
-    robo: "BEEP BOOP! Great job! Next time, take a breath instead of saying 'umm'. New challenge ready?",
-    ustad: "Shabash beta! Bohat acha. Thoda aahista bolo taake sab sun sake. Ab agay batao.",
-  };
-  return fallbacks[characterId] || fallbacks.zara;
+function getFallback(characterId: string): string {
+  const f: Record<string, string> = {
+    zara:  "Yaar acha tha! Thoda slow bolo next time. Ab batao — school mein kya scene hai?",
+    robo:  "BEEP BOOP! Good signal! Next: breathe before speaking! What is your favorite subject?",
+    ustad: "Beta, acha kaha. Thoda aahista bolo. Ab batao — ghar mein sab theek hai?",
+  }
+  return f[characterId] || f.zara
 }

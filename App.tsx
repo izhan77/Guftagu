@@ -12,6 +12,10 @@ import ParentConsentScreen from "./src/screens/Onboarding/ParentConsentScreen";
 import ParentEmailScreen from "./src/screens/Auth/ParentEmailScreen";
 import CharacterSelectScreen from "./src/screens/Main/CharacterSelectScreen";
 import SessionScreen from "./src/screens/Main/SessionScreen";
+import SessionCompleteScreen from "./src/screens/Main/SessionCompleteScreen";
+import DashboardScreen from "./src/screens/Main/DashboardScreen";
+import ParentPortalScreen from "./src/screens/Parent/ParentPortalScreen";
+import ParentDashboardScreen from "./src/screens/Parent/ParentDashboardScreen";
 
 const Stack = createStackNavigator();
 
@@ -49,6 +53,13 @@ export default function App() {
           component={CharacterSelectScreen}
         />
         <Stack.Screen name="Session" component={SessionScreen} />
+        <Stack.Screen
+          name="SessionComplete"
+          component={SessionCompleteScreen}
+        />
+        <Stack.Screen name="Dashboard" component={DashboardScreen} />
+        <Stack.Screen name="ParentPortal" component={ParentPortalScreen} />
+        <Stack.Screen name="ParentDashboard" component={ParentDashboardScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
