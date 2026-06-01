@@ -104,7 +104,9 @@ export async function getCharacterResponse(
   const soul = CHARACTER_SOULS[characterId] || CHARACTER_SOULS.zara
 
   const words = userMessage.trim().split(/\s+/)
-  const FILLERS = ["umm","uh","like","um","ah","er","aaa","hmm"]
+  const FILLERS = ["umm", "uh", "like", "um", "ah", "er", "aaa", "hmm", 
+  "aah", "ooh", "mmm", "un", "aam", "ehm",
+  "ummm", "uhh", "ahh", "hmmm", "aahh", "oohh", "mmm", "unn", "aamm", "ehmm"]
   const fillerCount = words.filter(w => FILLERS.includes(w.toLowerCase())).length
   const wordCount = words.length
   const tip = getNaturalTip(wordCount, fillerCount, characterId)
