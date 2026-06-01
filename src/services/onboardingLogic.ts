@@ -17,7 +17,7 @@ import {
 
 
 const ensureAuthenticated = async (): Promise<User> => {
-  // Wait for persisted session to hydrate; avoids new anonymous uid on each launch
+  
   await auth.authStateReady();
 
   let user = auth.currentUser;
