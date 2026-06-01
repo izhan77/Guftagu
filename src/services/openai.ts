@@ -73,24 +73,24 @@ MAX 40 WORDS. Warm. Dignified. Real grandfather energy.`,
 function getNaturalTip(wordCount: number, fillerCount: number, characterId: string): string {
   if (fillerCount >= 3) {
     const t: Record<string, string> = {
-      zara:  `${fillerCount} baar "umm" bola — next time ek second ruko phir bolo`,
+      zara:  `${fillerCount} baar "umm" bola - next time ek second ruko phir bolo`,
       robo:  `FILLER DETECTED: ${fillerCount}x. MISSION: breathe, then speak`,
-      ustad: `${fillerCount} baar ruke — ek lambi saans lo pehle bolne se`,
+      ustad: `${fillerCount} baar ruke - ek lambi saans lo pehle bolne se`,
     }
     return t[characterId] || t.zara
   }
   if (wordCount < 8) {
     const t: Record<string, string> = {
-      zara:  `thoda aur bolo yaar — ek poora sentence try karo`,
+      zara:  `thoda aur bolo yaar - ek poora sentence try karo`,
       robo:  `MORE DATA NEEDED. One more sentence please, human`,
-      ustad: `thoda aur batao beta — poori baat karo`,
+      ustad: `thoda aur batao beta - poori baat karo`,
     }
     return t[characterId] || t.zara
   }
   const t: Record<string, string> = {
-    zara:  `${wordCount} words — yeh progress hai yaar`,
+    zara:  `${wordCount} words - yeh progress hai yaar`,
     robo:  `${wordCount} WORDS PROCESSED. Excellent data output!`,
-    ustad: `${wordCount} alfaaz — yeh achha hai beta`,
+    ustad: `${wordCount} alfaaz - yeh achha hai beta`,
   }
   return t[characterId] || t.zara
 }
