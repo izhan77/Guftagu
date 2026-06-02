@@ -1,32 +1,48 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+// src/screens/Onboarding/ParentConsentScreen.tsx
+import React, { useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, BackHandler } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function ParentConsentScreen({ navigation, route }: any) {
-  const { ageGroup } = route.params || { ageGroup: 'Under 14' };
+  const { ageGroup, fromAgeGate } = route.params || { ageGroup: 'Under 14', fromAgeGate: false };
+
+  // Handle Android back button
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleGoBack();
+      return true;
+    });
+    return () => backHandler.remove();
+  }, []);
 
   const handleGoBack = () => {
-    // Check if we can go back
-    if (navigation.canGoBack()) {
-      navigation.goBack();
+    // If coming from AgeGate, go back to AgeGate
+    if (fromAgeGate) {
+      navigation.replace('AgeInput');
     } else {
-      // If can't go back, navigate to AgeInput
-      navigation.navigate('AgeInput');
+      // If coming from somewhere else, try to go back
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        navigation.replace('AgeInput');
+      }
     }
   };
 
   return (
     <LinearGradient colors={['#F7F2FF', '#FFFFFF']} style={styles.container}>
       <SafeAreaView style={styles.safe}>
-        {/* Add Back Button at Top Left */}
+        {/* Back Button at Top Left */}
         <TouchableOpacity style={styles.backButtonTop} onPress={handleGoBack}>
           <Ionicons name="arrow-back" size={24} color="#7C5CBF" />
         </TouchableOpacity>
 
-        <ScrollView contentContainerStyle={styles.scroll}>
-          
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.shieldCircle}>
             <Ionicons name="shield-checkmark" size={50} color="#7C5CBF" />
           </View>
@@ -81,15 +97,78 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  scroll: { alignItems: 'center', padding: 24, paddingTop: 80 },
-  shieldCircle: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#7C5CBF15', justifyContent: 'center', alignItems: 'center', marginTop: 20, marginBottom: 20 },
-  title: { fontSize: 28, fontFamily: 'Poppins-ExtraBold', color: '#2D2D2D', textAlign: 'center' },
-  subtitle: { fontSize: 16, fontFamily: 'Poppins-SemiBold', color: '#8A8A8A', textAlign: 'center', marginTop: 10, lineHeight: 24 },
-  infoCard: { backgroundColor: '#F9F9F9', borderRadius: 24, padding: 24, width: '100%', marginTop: 30 },
-  bullet: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
-  bulletText: { marginLeft: 14, fontSize: 15, fontFamily: 'Poppins-Medium', color: '#444', flex: 1 },
-  button: { width: '100%', backgroundColor: '#7C5CBF', paddingVertical: 18, borderRadius: 20, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 40, gap: 10, elevation: 4 },
-  buttonText: { color: 'white', fontSize: 17, fontFamily: 'Poppins-Bold' },
-  backButton: { marginTop: 20 },
-  backButtonText: { color: '#AAA', fontSize: 14, fontFamily: 'Poppins-SemiBold' }
+  scrollContent: {
+    flexGrow: 1,
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 80,
+    paddingBottom: 40,
+  },
+  shieldCircle: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: '#7C5CBF15',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 28,
+    fontFamily: 'Poppins-ExtraBold',
+    color: '#2D2D2D',
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#8A8A8A',
+    textAlign: 'center',
+    marginTop: 10,
+    lineHeight: 24,
+  },
+  infoCard: {
+    backgroundColor: '#F9F9F9',
+    borderRadius: 24,
+    padding: 24,
+    width: '100%',
+    marginTop: 30,
+  },
+  bullet: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  bulletText: {
+    marginLeft: 14,
+    fontSize: 15,
+    fontFamily: 'Poppins-Medium',
+    color: '#444',
+    flex: 1,
+  },
+  button: {
+    width: '100%',
+    backgroundColor: '#7C5CBF',
+    paddingVertical: 18,
+    borderRadius: 20,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 40,
+    gap: 10,
+    elevation: 4,
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 17,
+    fontFamily: 'Poppins-Bold',
+  },
+  backButton: {
+    marginTop: 20,
+  },
+  backButtonText: {
+    color: '#AAA',
+    fontSize: 14,
+    fontFamily: 'Poppins-SemiBold',
+  },
 });

@@ -15,20 +15,69 @@ import {
   isSessionFullyOnboarded,
 } from './asyncStorage';
 
+export interface UserStatus {
+  hasUser: boolean;
+  hasAge: boolean;
+  currentAge?: number;
+  currentAgeGroup?: string;
+  needsParentConsent?: boolean;
+  parentConsentGiven?: boolean;
+  hasNickname?: boolean;
+}
+
+export const getUserStatus = async (): Promise<UserStatus> => {
+  try {
+    await auth.authStateReady();
+    const user = auth.currentUser;
+    
+    if (!user) {
+      return { hasUser: false, hasAge: false };
+    }
+    
+    const userDocRef = doc(db, 'users', user.uid);
+    const userDocSnap = await getDoc(userDocRef);
+    
+    if (!userDocSnap.exists()) {
+      return { hasUser: true, hasAge: false };
+    }
+    
+    const userData = userDocSnap.data();
+    const age = userData.age;
+    
+    if (!age) {
+      return { hasUser: true, hasAge: false };
+    }
+    
+    // Convert age to ageGroup string
+    let ageGroup = '14+';
+    if (age <= 7) ageGroup = '6-7';
+    else if (age <= 9) ageGroup = '8-9';
+    else if (age <= 11) ageGroup = '10-11';
+    else if (age <= 13) ageGroup = '12-13';
+    
+    return {
+      hasUser: true,
+      hasAge: true,
+      currentAge: age,
+      currentAgeGroup: ageGroup,
+      needsParentConsent: age < 14 && !userData.parentConsent,
+      parentConsentGiven: userData.parentConsent === true,
+      hasNickname: !!(userData.nickname && userData.onboardingComplete === true),
+    };
+  } catch (error) {
+    console.error('Error getting user status:', error);
+    return { hasUser: false, hasAge: false };
+  }
+};
+
 
 const ensureAuthenticated = async (): Promise<User> => {
-  // Wait for persisted session to hydrate; avoids new anonymous uid on each launch
   await auth.authStateReady();
-
   let user = auth.currentUser;
-
   if (!user) {
-    console.log(' No user found — signing in anonymously...');
     const result = await signInAnonymously(auth);
     user = result.user;
-    console.log('Signed in anonymously:', user.uid);
   }
-
   return user;
 };
 
@@ -52,54 +101,103 @@ export const checkUserOnboarding = async (): Promise<{
   }
 };
 
-
 const parseAgeString = (ageString: string): number => {
   if (ageString === '14+') return 14;
   const match = ageString.match(/\d+/);
   return match ? parseInt(match[0], 10) : 0;
 };
 
-//SCREEN 2: Save age consent to Firestore + AsyncStorage
 export const saveAgeConsent = async (
   ageString: string
-): Promise<{ needsParentConsent: boolean; age: number }> => {
+): Promise<{ needsParentConsent: boolean; age: number; wasOverridden: boolean }> => {
   try {
-    // Ensure user is signed in before writing to Firestore
-    const user = await ensureAuthenticated();
+    // Ensure user is signed in
+    await auth.authStateReady();
+    let user = auth.currentUser;
+    let wasOverridden = false;
+
+    // If no user exists, create one
+    if (!user) {
+      console.log('No user found — signing in anonymously...');
+      const result = await signInAnonymously(auth);
+      user = result.user;
+      console.log('Created new anonymous user:', user.uid);
+    } else {
+      // User exists → we are OVERRIDING their age
+      wasOverridden = true;
+      console.log('User exists, will OVERRIDE age:', user.uid);
+    }
 
     const age = parseAgeString(ageString);
     const needsParentConsent = age < 14;
 
     const userDocRef = doc(db, 'users', user.uid);
     const userDocSnap = await getDoc(userDocRef);
-
-    // Create or update user document with age consent
-    if (!userDocSnap.exists()) {
-      await setDoc(userDocRef, {
-        uid: user.uid,
-        anonId: generateAnonId(),
-        age,
-        ageConsent: true,
-        parentConsent: !needsParentConsent, // If 14+, auto-approve parent consent
-        onboardingComplete: false,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-      });
+    
+    // Get existing data safely (no undefined)
+    const existingData = userDocSnap.exists() ? userDocSnap.data() : null;
+    
+    // Get existing anonId or generate new one
+    const anonId = existingData?.anonId || generateAnonId();
+    
+    // 🔥 CRITICAL FIX: Only include nickname if it exists (not undefined)
+    const nicknameValue = existingData?.nickname || null;
+    const onboardingCompleteValue = existingData?.onboardingComplete || false;
+    
+    // Build document data WITHOUT undefined values
+    const docData: any = {
+      uid: user.uid,
+      anonId,
+      age,
+      ageConsent: true,
+      parentConsent: !needsParentConsent,
+      updatedAt: Timestamp.now(),
+      createdAt: existingData?.createdAt || Timestamp.now(),
+    };
+    
+    // Only add nickname if it has a value (not undefined, not null)
+    if (nicknameValue) {
+      docData.nickname = nicknameValue;
+    }
+    
+    // Only add onboardingComplete if needed
+    if (onboardingCompleteValue) {
+      docData.onboardingComplete = onboardingCompleteValue;
+    }
+    
+    // Only add totalSessions if exists
+    if (existingData?.totalSessions !== undefined) {
+      docData.totalSessions = existingData.totalSessions;
+    }
+    
+    // Only add confidenceScore if exists
+    if (existingData?.confidenceScore !== undefined) {
+      docData.confidenceScore = existingData.confidenceScore;
     } else {
-      await updateDoc(userDocRef, {
-        age,
-        ageConsent: true,
-        parentConsent: !needsParentConsent,
-        updatedAt: Timestamp.now(),
-      });
+      docData.confidenceScore = 50; // Default
+    }
+    
+    // Use setDoc with merge to OVERRIDE age but preserve other fields
+    await setDoc(userDocRef, docData, { merge: true });
+
+    // If age changed and parent consent was previously given but now needs re-consent
+    if (wasOverridden && needsParentConsent) {
+      const existingParentConsent = existingData?.parentConsent || false;
+      const existingAge = existingData?.age || null;
+      
+      // If user changed from 14+ to under 14, reset parent consent
+      if (existingAge && existingAge >= 14 && age < 14) {
+        await updateDoc(userDocRef, {
+          parentConsent: false,
+          consentId: deleteField(),
+          linkedParentId: deleteField(),
+        });
+        console.log('Age changed from 14+ to under 14 – reset parent consent');
+      }
     }
 
-    // Get the anonId (either existing or newly created)
-    const anonId = userDocSnap.exists()
-      ? userDocSnap.data().anonId
-      : generateAnonId();
-
-    // Save to AsyncStorage for quick access
+    // Save to AsyncStorage
+    const existingSession = await getUserSession();
     await saveUserSession({
       email: user.email || '',
       anonId,
@@ -107,18 +205,17 @@ export const saveAgeConsent = async (
       ageConsent: true,
       parentConsent: !needsParentConsent,
       timestamp: getCurrentTimestamp(),
+      nickname: existingSession?.nickname || null,
     });
 
-    console.log(`Age consent saved: age=${age}, needsParent=${needsParentConsent}`);
+    console.log(`Age saved (${wasOverridden ? 'OVERRIDE' : 'NEW'}): age=${age}, needsParent=${needsParentConsent}`);
 
-    return { needsParentConsent, age };
+    return { needsParentConsent, age, wasOverridden };
   } catch (error) {
     console.error('Error saving age consent:', error);
     throw error;
   }
 };
-
-// SCREEN 3B: PARENT EMAIL & MATH CHALLENGE
 
 const generateMathChallenge = (): { problem: string; answer: number } => {
   const num1 = Math.floor(Math.random() * 30) + 10; // 10-40
@@ -244,27 +341,37 @@ export const verifyParentAnswer = async (consentId: string, answer: string): Pro
   return true;
 };
 
-
-// SCREEN 4: CHILD PROFILE (NICKNAME)
-
 export const saveChildProfile = async (nickname: string): Promise<void> => {
   try {
     const user = await ensureAuthenticated();
     const trimmed = nickname.trim();
 
     const userDocRef = doc(db, 'users', user.uid);
+    const userDocSnap = await getDoc(userDocRef);
+    const existingData = userDocSnap.exists() ? userDocSnap.data() : null;
 
-    // Always merge into the same users/{uid} document — never a second user row
-    await setDoc(
-      userDocRef,
-      {
-        uid: user.uid,
-        nickname: trimmed,
-        onboardingComplete: true,
-        updatedAt: Timestamp.now(),
-      },
-      { merge: true }
-    );
+    // Build document data WITHOUT undefined
+    const docData: any = {
+      uid: user.uid,
+      nickname: trimmed,
+      onboardingComplete: true,
+      updatedAt: Timestamp.now(),
+    };
+    
+    // Preserve existing fields if they exist
+    if (existingData?.anonId) docData.anonId = existingData.anonId;
+    if (existingData?.age) docData.age = existingData.age;
+    if (existingData?.ageConsent !== undefined) docData.ageConsent = existingData.ageConsent;
+    if (existingData?.parentConsent !== undefined) docData.parentConsent = existingData.parentConsent;
+    if (existingData?.confidenceScore !== undefined) {
+      docData.confidenceScore = existingData.confidenceScore;
+    } else {
+      docData.confidenceScore = 50;
+    }
+    if (existingData?.createdAt) docData.createdAt = existingData.createdAt;
+    else docData.createdAt = Timestamp.now();
+
+    await setDoc(userDocRef, docData, { merge: true });
 
     await saveUserSession({
       nickname: trimmed,
@@ -272,14 +379,12 @@ export const saveChildProfile = async (nickname: string): Promise<void> => {
       timestamp: getCurrentTimestamp(),
     });
 
-    console.log(` Child profile saved (merge): nickname=${trimmed}`);
+    console.log(`Child profile saved: nickname=${trimmed}`);
   } catch (error) {
-    console.error(' Error saving child profile:', error);
+    console.error('Error saving child profile:', error);
     throw error;
   }
 };
-
-//  LOGOUT & SESSION MANAGEMENT
 
 export const signOutUser = async (): Promise<void> => {
   try {
@@ -342,9 +447,6 @@ export const saveSessionInteraction = async (
   }
 };
 
-// Add to onboardingLogic.ts
-
-// Create parent account and link to child
 export const linkChildToParent = async (
   parentEmail: string,
   childUid: string
@@ -386,3 +488,4 @@ export const linkChildToParent = async (
   
   return parentId;
 };
+

@@ -22,8 +22,6 @@ const Stack = createStackNavigator();
 export default function App() {
   const isReady = usePreloadAssets();
 
-  // If assets aren't ready, keep showing the splash or a blank view
-  // that matches the splash background color.
   if (!isReady) {
     return <View style={{ flex: 1, backgroundColor: "#FFFFFF" }} />;
   }
