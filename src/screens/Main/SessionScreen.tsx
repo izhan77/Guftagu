@@ -1,4 +1,3 @@
-// src/screens/Main/SessionScreen.tsx
 import React, { useState, useRef, useEffect } from "react";
 import {
   View,
@@ -19,6 +18,8 @@ import { Audio } from "expo-av";
 import { getCharacterResponse } from "../../services/openai";
 import { getCharacterAudio } from "../../services/elevenlabs";
 import { transcribeAudio } from "../../services/whisper";
+import { analyzeExchange, calculateExchangeScore, ExchangeMetrics } from "../../services/scoring";
+import { ExchangeData } from "../../services/sessionService"; // we'll define this later
 
 const { height } = Dimensions.get("window");
 
@@ -55,7 +56,7 @@ const CHAR_CONFIG: Record<
   },
 };
 
-const MAX_EXCHANGES = 3;
+const MAX_EXCHANGES = 5; // CHANGED FROM 3 TO 5
 
 export default function SessionScreen({ navigation, route }: any) {
   const { character, childName } = route.params || {};
@@ -74,6 +75,8 @@ export default function SessionScreen({ navigation, route }: any) {
   const [exchangeCount, setExchangeCount] = useState(0);
   const [showChatModal, setShowChatModal] = useState(false);
   const [showTalkVideo, setShowTalkVideo] = useState(false);
+  const [exchangeHistory, setExchangeHistory] = useState<ExchangeData[]>([]);
+  const sessionStartTime = useRef<number>(Date.now());
 
   const micScale = useRef(new Animated.Value(1)).current;
   const micGlowAnim = useRef(new Animated.Value(0)).current;
@@ -205,13 +208,30 @@ export default function SessionScreen({ navigation, route }: any) {
       const userSpeech = await transcribeAudio(uri);
       const finalText = userSpeech || "I want to talk";
 
+      // --- ANALYZE EXCHANGE METRICS ---
+      const metrics: ExchangeMetrics = analyzeExchange(finalText);
+      const exchangeScore = calculateExchangeScore(metrics);
+
       setChat((prev) => [...prev, { role: "user", text: finalText }]);
 
       const aiText = await getCharacterResponse(finalText, charId, childName, chat);
       setChat((prev) => [...prev, { role: "assistant", text: aiText }]);
 
-      const newCount = exchangeCount + 1;
-      setExchangeCount(newCount);
+      // Store exchange data
+      const newExchangeNumber = exchangeCount + 1;
+      const newExchange: ExchangeData = {
+        exchangeNumber: newExchangeNumber,
+        childTranscript: finalText,
+        wordCount: metrics.wordCount,
+        fillerCount: metrics.fillerWordCount,
+        sentenceCount: metrics.sentenceCount,
+        avgSentenceLength: metrics.avgSentenceLength,
+        characterResponse: aiText,
+        exchangeScore: exchangeScore,
+        detectedMood: undefined, // optional, can be added later
+      };
+      setExchangeHistory(prev => [...prev, newExchange]);
+      setExchangeCount(newExchangeNumber);
 
       const base64Audio = await getCharacterAudio(aiText, charId);
       if (base64Audio) {
@@ -221,19 +241,35 @@ export default function SessionScreen({ navigation, route }: any) {
         newSound.setOnPlaybackStatusUpdate((ps) => {
           if (ps.isLoaded && ps.didJustFinish) {
             newSound.unloadAsync();
-            if (newCount >= MAX_EXCHANGES) {
-              navigation.navigate("SessionComplete", { childName, character });
+            // After talking finishes, check if session is complete
+            if (newExchangeNumber >= MAX_EXCHANGES) {
+              const totalDuration = (Date.now() - sessionStartTime.current) / 1000;
+              navigation.navigate("SessionComplete", {
+                childName,
+                character,
+                exchangeHistory: [...exchangeHistory, newExchange],
+                sessionDuration: totalDuration,
+                sessionTip: "", // can be generated later
+              });
             } else {
               setAppStatus("idle");
             }
           }
         });
       } else {
+        // Fallback: no audio, just simulate talk time
         setAppStatus("talking");
         const readMs = Math.min(8000, Math.max(2500, aiText.length * 45));
         timerRef.current = setTimeout(() => {
-          if (newCount >= MAX_EXCHANGES) {
-            navigation.navigate("SessionComplete", { childName, character });
+          if (newExchangeNumber >= MAX_EXCHANGES) {
+            const totalDuration = (Date.now() - sessionStartTime.current) / 1000;
+            navigation.navigate("SessionComplete", {
+              childName,
+              character,
+              exchangeHistory: [...exchangeHistory, newExchange],
+              sessionDuration: totalDuration,
+              sessionTip: "",
+            });
           } else {
             setAppStatus("idle");
           }
@@ -317,21 +353,9 @@ export default function SessionScreen({ navigation, route }: any) {
         </View>
       </LinearGradient>
 
-<TouchableOpacity
-  style={styles.testCompleteBtn}
-  onPress={() => navigation.navigate("SessionComplete", {
-    childName,
-    character,
-    exchangeScores: [65, 72, 78],
-    exchangeMetrics: [],
-    sessionTip: "Try to take a breath before speaking",
-  })}
->
-  <Ionicons name="arrow-forward-circle" size={32} color={themeColor} />
-  <Text style={{ color: themeColor, fontSize: 12 }}>Test Complete</Text>
-</TouchableOpacity>
+      {/* REMOVED testCompleteBtn */}
 
-      {/* SIMPLE WORKING MODAL */}
+      {/* Chat Modal (unchanged, works) */}
       <Modal visible={showChatModal} animationType="slide" transparent onRequestClose={() => setShowChatModal(false)}>
         <View style={{ flex: 1, backgroundColor: 'white', marginTop: 50 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#EEE' }}>
@@ -377,16 +401,6 @@ export default function SessionScreen({ navigation, route }: any) {
 }
 
 const styles = StyleSheet.create({
-  testCompleteBtn: {
-  position: 'absolute',
-  bottom: 10,
-  right: 10,
-  alignItems: 'center',
-  backgroundColor: 'rgba(255,255,255,0.7)',
-  padding: 8,
-  borderRadius: 30,
-  zIndex: 100,
-},
   root: { flex: 1 },
   characterSection: { height: height * 0.6, position: "relative", overflow: "hidden" },
   characterBottomMask: { position: "absolute", bottom: 0, left: 0, right: 0, height: height * 0.22, zIndex: 10 },
