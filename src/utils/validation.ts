@@ -171,10 +171,10 @@ export const validateNickname = (nickname: string): ValidationResult => {
  */
 export const sanitizeNickname = (nickname: string): string => {
   return nickname
-    .trim()                           // Remove leading/trailing spaces
-    .replace(/\s+/g, ' ')             // Replace multiple spaces with single space
-    .replace(/[^\w\s\-'.]/g, '')      // Remove invalid special characters (including emojis)
-    .substring(0, 20);                 // Trim to 20 characters
+    .trim()                           
+    .replace(/\s+/g, ' ')             
+    .replace(/[^\w\s\-'.]/g, '')      
+    .substring(0, 20);                
 };
 
 /**
