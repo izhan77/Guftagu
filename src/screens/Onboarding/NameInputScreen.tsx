@@ -19,6 +19,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { saveChildProfile } from "../../services/onboardingLogic";
+import { validateNickname, sanitizeNickname, getNicknameHint, ValidationResult } from "../../utils/validation";
 
 const { width, height } = Dimensions.get("window");
 
@@ -26,15 +27,16 @@ export default function NameInputScreen({ navigation, route }: any) {
   const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [validation, setValidation] = useState<ValidationResult>({ isValid: false, errorMessage: null });
+  const [isTouched, setIsTouched] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const headerAnim = useRef(new Animated.Value(0)).current;
   const { ageGroup } = route.params;
 
   // Monitor keyboard visibility with animation
   useEffect(() => {
-    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', (e) => {
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
       setIsKeyboardVisible(true);
-      // Animate header when keyboard appears
       Animated.timing(headerAnim, {
         toValue: 1,
         duration: 250,
@@ -43,7 +45,6 @@ export default function NameInputScreen({ navigation, route }: any) {
     });
     const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
       setIsKeyboardVisible(false);
-      // Animate header back
       Animated.timing(headerAnim, {
         toValue: 0,
         duration: 250,
@@ -57,14 +58,39 @@ export default function NameInputScreen({ navigation, route }: any) {
     };
   }, []);
 
+  // Validate name whenever it changes
+  useEffect(() => {
+    if (isTouched || name.length > 0) {
+      const result = validateNickname(name);
+      setValidation(result);
+    }
+  }, [name, isTouched]);
+
+  const handleNameChange = (text: string) => {
+    setName(text);
+    if (!isTouched && text.length > 0) {
+      setIsTouched(true);
+    }
+  };
+
   const handleContinue = async () => {
-    if (name.length <= 2 || isLoading) return;
+    // Validate before proceeding
+    const result = validateNickname(name);
+    
+    if (!result.isValid) {
+      Alert.alert("Invalid Nickname", result.errorMessage || "Please enter a valid nickname");
+      return;
+    }
+    
+    if (isLoading) return;
     
     setIsLoading(true);
     try {
-      await saveChildProfile(name.trim());
+      // Sanitize the nickname before saving
+      const sanitizedName = sanitizeNickname(name);
+      await saveChildProfile(sanitizedName);
       navigation.navigate("CharacterSelect", {
-        name: name.trim(),
+        name: sanitizedName,
         ageGroup,
         fromOnboarding: true,
       });
@@ -91,6 +117,9 @@ export default function NameInputScreen({ navigation, route }: any) {
     inputRange: [0, 1],
     outputRange: [0, -20],
   });
+
+  const isNameValid = validation.isValid && name.trim().length >= 2;
+  const showError = isTouched && !validation.isValid && name.length > 0;
 
   return (
     <LinearGradient colors={["#EEE6FF", "#FFFFFF"]} style={styles.container}>
@@ -138,14 +167,17 @@ export default function NameInputScreen({ navigation, route }: any) {
               <View style={styles.inputContainer}>
                 <TextInput
                   ref={inputRef}
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    showError && styles.inputError
+                  ]}
                   placeholder="Enter your name..."
                   placeholderTextColor="#AAA"
                   value={name}
-                  onChangeText={setName}
+                  onChangeText={handleNameChange}
                   autoFocus={Platform.OS !== "ios"}
                   editable={!isLoading}
-                  maxLength={20}
+                  maxLength={25}
                   returnKeyType="done"
                   onSubmitEditing={handleContinue}
                 />
@@ -159,23 +191,47 @@ export default function NameInputScreen({ navigation, route }: any) {
                 )}
               </View>
 
-              {/* Character counter */}
-              {name.length > 0 && (
-                <Text style={[
-                  styles.counter,
-                  name.length < 3 && styles.counterWarning
-                ]}>
-                  {name.length}/20 characters
-                </Text>
+              {/* Validation Messages */}
+              {showError && validation.errorMessage && (
+                <View style={styles.errorContainer}>
+                  <Ionicons name="alert-circle" size={14} color="#FF3B30" />
+                  <Text style={styles.errorText}>{validation.errorMessage}</Text>
+                </View>
               )}
+
+              {/* Character counter with validation status */}
+              {name.length > 0 && (
+                <View style={styles.counterRow}>
+                  <View style={styles.counterItem}>
+                    <Text style={[
+                      styles.counter,
+                      name.length < 2 && styles.counterWarning,
+                      isNameValid && styles.counterSuccess
+                    ]}>
+                      {name.length}/20 chars
+                    </Text>
+                  </View>
+                  {isNameValid && name.length >= 2 && (
+                    <View style={styles.validBadge}>
+                      <Ionicons name="checkmark-circle" size={14} color="#4CAF50" />
+                      <Text style={styles.validText}>Good!</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Hint text */}
+              <Text style={styles.hintText}>
+                {getNicknameHint()}
+              </Text>
 
               <TouchableOpacity
                 style={[
                   styles.button,
-                  { backgroundColor: name.length > 2 && !isLoading ? "#7C5CBF" : "#D1D1D1" },
+                  { backgroundColor: isNameValid && !isLoading ? "#7C5CBF" : "#D1D1D1" },
                 ]}
                 onPress={handleContinue}
-                disabled={name.length <= 2 || isLoading}
+                disabled={!isNameValid || isLoading}
               >
                 {isLoading ? (
                   <ActivityIndicator color="#FFF" size="small" />
@@ -235,7 +291,7 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-ExtraBold",
     color: "#2D2D2D",
     textAlign: "center",
-    lineHeight: width > 400 ? 48 : 35,
+    lineHeight: width > 400 ? 48 : 42,
     marginTop: 22,
   },
   subtitle: {
@@ -262,28 +318,80 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     paddingRight: 30,
   },
+  inputError: {
+    borderBottomColor: "#FF3B30",
+  },
   clearButton: {
     position: "absolute",
     right: 0,
     bottom: 10,
     padding: 4,
   },
+  errorContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 8,
+    backgroundColor: "#FFE8E8",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  errorText: {
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#FF3B30",
+    flex: 1,
+  },
+  counterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 8,
+  },
+  counterItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   counter: {
     fontSize: 12,
     fontFamily: "Poppins-Medium",
     color: "#7C5CBF",
-    marginTop: 8,
-    textAlign: "right",
   },
   counterWarning: {
     color: "#FF9800",
+  },
+  counterSuccess: {
+    color: "#4CAF50",
+  },
+  validBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#E8FFE8",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  validText: {
+    fontSize: 10,
+    fontFamily: "Poppins-Bold",
+    color: "#4CAF50",
+  },
+  hintText: {
+    fontSize: 11,
+    fontFamily: "Poppins-Regular",
+    color: "#7a7878",
+    marginTop: 12,
+    textAlign: "center",
   },
   button: {
     paddingVertical: width > 400 ? 18 : 16,
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: height > 700 ? 50 : 35,
+    marginTop: height > 700 ? 30 : 25,
     flexDirection: "row",
     gap: 10,
   },
