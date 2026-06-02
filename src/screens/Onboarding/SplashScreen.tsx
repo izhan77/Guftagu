@@ -16,7 +16,6 @@ function ageGroupLabelFromSession(age: number | undefined): string {
 export default function SplashScreen({ navigation }: any) {
   const animation = useRef<LottieView>(null);
   const [showIntro, setShowIntro] = useState(false);
-  const [redirectTarget, setRedirectTarget] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -27,53 +26,18 @@ export default function SplashScreen({ navigation }: any) {
         
         // If user already completed onboarding, go straight to character select
         if (isSessionFullyOnboarded(session)) {
-          setRedirectTarget('CharacterSelect');
-          setShowIntro(true);
+          navigation.replace('Dashboard');
           return;
         }
       } catch (e) {
         console.warn('Splash session check failed', e);
       }
-      if (!cancelled) {
-        setRedirectTarget('AgeInput');
-        setShowIntro(true);
-      }
+      if (!cancelled) setShowIntro(true);
     })();
     return () => {
       cancelled = true;
     };
   }, [navigation]);
-
-  const handleAnimationFinish = () => {
-    if (redirectTarget === 'CharacterSelect') {
-      // Get session data to pass
-      getUserSession().then(session => {
-        if (session && session.nickname) {
-          navigation.reset({
-            index: 0,
-            routes: [{
-              name: 'CharacterSelect',
-              params: {
-                name: session.nickname.trim(),
-                ageGroup: ageGroupLabelFromSession(session.age),
-                fromOnboarding: false,
-              }
-            }],
-          });
-        } else {
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'AgeInput' }],
-          });
-        }
-      });
-    } else {
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'AgeInput' }],
-      });
-    }
-  };
 
   if (!showIntro) {
     return <View style={styles.container} />;
@@ -87,7 +51,7 @@ export default function SplashScreen({ navigation }: any) {
         style={styles.animation}
         autoPlay
         loop={false}
-        onAnimationFinish={handleAnimationFinish}
+        onAnimationFinish={() => navigation.replace('AgeInput')}
         renderMode="SOFTWARE"
       />
     </View>

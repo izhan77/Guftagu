@@ -313,21 +313,34 @@ export const verifyParentAnswer = async (consentId: string, answer: string): Pro
   
   if (!isCorrect) return false;
   
+  // Store parentEmail before it's deleted
+  const parentEmail = data.parentEmail;
+  
   // Update consent status
   await updateDoc(consentRef, { status: 'verified', verifiedAt: Timestamp.now() });
   
-  // Update user document
+  // Update user document with parent consent
   const userRef = doc(db, 'users', user.uid);
   await updateDoc(userRef, {
     parentConsent: true,
     consentVerifiedAt: Timestamp.now(),
   });
   
-  // ✅ FIX THIS - Delete BOTH email fields
+  // Link child to parent (if email exists)
+  if (parentEmail) {
+    try {
+      await linkChildToParent(parentEmail, user.uid);
+      console.log(`Child ${user.uid} linked to parent email ${parentEmail}`);
+    } catch (error) {
+      console.error('Failed to link child to parent:', error);
+      // Continue – child can still use app, but parent portal may not work
+    }
+  }
+  
+  // Delete sensitive data from child's document (COPPA)
   await updateDoc(userRef, {
-    pendingParentEmail: deleteField(),  // Delete this
-    // parentEmail: deleteField(),       // Also delete if exists
-    consentId: deleteField(),            // Also delete consentId reference
+    pendingParentEmail: deleteField(),
+    consentId: deleteField(),
   });
   
   // Delete sensitive data from consent document
@@ -336,6 +349,7 @@ export const verifyParentAnswer = async (consentId: string, answer: string): Pro
     mathAnswer: deleteField(),
   });
   
+  // Update local AsyncStorage
   await saveUserSession({ parentConsent: true });
   
   return true;
@@ -453,7 +467,7 @@ export const linkChildToParent = async (
 ): Promise<string> => {
   // Check if parent already exists
   const parentsRef = collection(db, 'parents');
-  const q = query(parentsRef, where('email', '==', parentEmail));
+  const q = query(parentsRef, where('email', '==', parentEmail.toLowerCase()));
   const querySnapshot = await getDocs(q);
   
   let parentId: string;
@@ -462,11 +476,14 @@ export const linkChildToParent = async (
     // Parent exists - add child to existing parent
     const parentDoc = querySnapshot.docs[0];
     parentId = parentDoc.id;
-    const existingChildren = parentDoc.data().linkedChildren || [];
-    await updateDoc(doc(db, 'parents', parentId), {
-      linkedChildren: [...existingChildren, childUid],
-      updatedAt: Timestamp.now()
-    });
+  const existingChildren = parentDoc.data().linkedChildren || [];
+const updatedChildren = existingChildren.includes(childUid)
+  ? existingChildren
+  : [...existingChildren, childUid];
+await updateDoc(doc(db, 'parents', parentId), {
+  linkedChildren: updatedChildren,
+  updatedAt: Timestamp.now()
+});
   } else {
     // Create new parent account (no password yet - will be set later)
     const newParentRef = await addDoc(collection(db, 'parents'), {

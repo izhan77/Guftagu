@@ -10,6 +10,7 @@ import {
   Platform,
   Modal,
   ScrollView,
+  Alert,
 } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { LinearGradient } from "expo-linear-gradient";
@@ -19,6 +20,8 @@ import { Audio } from "expo-av";
 import { getCharacterResponse } from "../../services/openai";
 import { getCharacterAudio } from "../../services/elevenlabs";
 import { transcribeAudio } from "../../services/whisper";
+import { analyzeExchange, calculateExchangeScore, ExchangeMetrics } from "../../services/scoring";
+import { ExchangeData } from "../../services/sessionService";
 
 const { height } = Dimensions.get("window");
 
@@ -55,7 +58,7 @@ const CHAR_CONFIG: Record<
   },
 };
 
-const MAX_EXCHANGES = 3;
+const MAX_EXCHANGES = 5;
 
 export default function SessionScreen({ navigation, route }: any) {
   const { character, childName } = route.params || {};
@@ -70,10 +73,14 @@ export default function SessionScreen({ navigation, route }: any) {
   const [chat, setChat] = useState<{ role: string; text: string }[]>([]);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const recordingRef = useRef<Audio.Recording | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [openingShown, setOpeningShown] = useState(false);
   const [exchangeCount, setExchangeCount] = useState(0);
   const [showChatModal, setShowChatModal] = useState(false);
   const [showTalkVideo, setShowTalkVideo] = useState(false);
+  const [exchangeHistory, setExchangeHistory] = useState<ExchangeData[]>([]);
+  const sessionStartTime = useRef<number>(Date.now());
 
   const micScale = useRef(new Animated.Value(1)).current;
   const micGlowAnim = useRef(new Animated.Value(0)).current;
@@ -107,27 +114,23 @@ export default function SessionScreen({ navigation, route }: any) {
     }
   }, [appStatus]);
 
+  // Cleanup effect
   useEffect(() => {
     return () => {
       if (sound) {
-        try {
-          sound.unloadAsync();
-        } catch (_) {}
+        try { sound.unloadAsync(); } catch (_) {}
       }
-      if (recording) {
+      if (recordingRef.current) {
         try {
-          recording.stopAndUnloadAsync();
+          recordingRef.current.stopAndUnloadAsync();
         } catch (_) {}
+        recordingRef.current = null;
       }
       if (timerRef.current) clearTimeout(timerRef.current);
-      try {
-        idlePlayer.pause();
-      } catch (_) {}
-      try {
-        talkPlayer.pause();
-      } catch (_) {}
+      try { idlePlayer.pause(); } catch (_) {}
+      try { talkPlayer.pause(); } catch (_) {}
     };
-  }, [sound, recording]);
+  }, [sound]);
 
   useEffect(() => {
     if (!openingShown) {
@@ -168,35 +171,72 @@ export default function SessionScreen({ navigation, route }: any) {
   };
 
   const handlePressIn = async () => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+
     try {
-      if (recording) {
-        try { await recording.stopAndUnloadAsync(); } catch (_) {}
+      // Clean up any existing recording before starting a new one
+      if (recordingRef.current) {
+        try {
+          await recordingRef.current.stopAndUnloadAsync();
+        } catch (_) {}
+        recordingRef.current = null;
         setRecording(null);
       }
-      const { status: perm } = await Audio.requestPermissionsAsync();
-      if (perm !== "granted") return;
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording: newRec } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      setRecording(newRec);
+
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission required", "Microphone access is needed for speaking practice.");
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const { recording: newRecording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      recordingRef.current = newRecording;
+      setRecording(newRecording);
       setAppStatus("listening");
       startMicPulse();
-    } catch {
+    } catch (error) {
+      console.error("Failed to start recording:", error);
       setAppStatus("idle");
+      Alert.alert("Error", "Could not start recording. Please try again.");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const handlePressOut = async () => {
-    if (!recording) {
+    if (isProcessing) return;
+    setIsProcessing(true);
+
+    const currentRecording = recordingRef.current;
+    if (!currentRecording) {
+      console.warn("No active recording to stop");
       setAppStatus("idle");
+      setIsProcessing(false);
       return;
     }
+
     stopMicPulse();
     setAppStatus("thinking");
+
     try {
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
+      await currentRecording.stopAndUnloadAsync();
+      const uri = currentRecording.getURI();
+      recordingRef.current = null;
       setRecording(null);
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+      });
+
       if (!uri) {
         setAppStatus("idle");
         return;
@@ -205,24 +245,59 @@ export default function SessionScreen({ navigation, route }: any) {
       const userSpeech = await transcribeAudio(uri);
       const finalText = userSpeech || "I want to talk";
 
+      // Analyze exchange metrics
+      const metrics: ExchangeMetrics = analyzeExchange(finalText);
+      const exchangeScore = calculateExchangeScore(metrics);
+
       setChat((prev) => [...prev, { role: "user", text: finalText }]);
 
-      const aiText = await getCharacterResponse(finalText, charId, childName, chat);
+      let aiText;
+      try {
+        aiText = await getCharacterResponse(finalText, charId, childName, chat);
+      } catch (error) {
+        console.error("Character response error:", error);
+        Alert.alert("Connection Error", "Failed to get a response. Please try again.");
+        setAppStatus("idle");
+        return;
+      }
+
       setChat((prev) => [...prev, { role: "assistant", text: aiText }]);
 
-      const newCount = exchangeCount + 1;
-      setExchangeCount(newCount);
+      const newExchangeNumber = exchangeCount + 1;
+      const newExchange: ExchangeData = {
+        exchangeNumber: newExchangeNumber,
+        childTranscript: finalText,
+        wordCount: metrics.wordCount,
+        fillerCount: metrics.fillerWordCount,
+        sentenceCount: metrics.sentenceCount,
+        avgSentenceLength: metrics.avgSentenceLength,
+        characterResponse: aiText,
+        exchangeScore: exchangeScore,
+        detectedMood: undefined,
+      };
+      setExchangeHistory(prev => [...prev, newExchange]);
+      setExchangeCount(newExchangeNumber);
 
       const base64Audio = await getCharacterAudio(aiText, charId);
       if (base64Audio) {
-        const { sound: newSound } = await Audio.Sound.createAsync({ uri: base64Audio }, { shouldPlay: true });
+        const { sound: newSound } = await Audio.Sound.createAsync(
+          { uri: base64Audio },
+          { shouldPlay: true }
+        );
         setSound(newSound);
         setAppStatus("talking");
         newSound.setOnPlaybackStatusUpdate((ps) => {
           if (ps.isLoaded && ps.didJustFinish) {
             newSound.unloadAsync();
-            if (newCount >= MAX_EXCHANGES) {
-              navigation.navigate("SessionComplete", { childName, character });
+            if (newExchangeNumber >= MAX_EXCHANGES) {
+              const totalDuration = (Date.now() - sessionStartTime.current) / 1000;
+              navigation.navigate("SessionComplete", {
+                childName,
+                character,
+                exchangeHistory: [...exchangeHistory, newExchange],
+                sessionDuration: totalDuration,
+                sessionTip: "",
+              });
             } else {
               setAppStatus("idle");
             }
@@ -232,8 +307,15 @@ export default function SessionScreen({ navigation, route }: any) {
         setAppStatus("talking");
         const readMs = Math.min(8000, Math.max(2500, aiText.length * 45));
         timerRef.current = setTimeout(() => {
-          if (newCount >= MAX_EXCHANGES) {
-            navigation.navigate("SessionComplete", { childName, character });
+          if (newExchangeNumber >= MAX_EXCHANGES) {
+            const totalDuration = (Date.now() - sessionStartTime.current) / 1000;
+            navigation.navigate("SessionComplete", {
+              childName,
+              character,
+              exchangeHistory: [...exchangeHistory, newExchange],
+              sessionDuration: totalDuration,
+              sessionTip: "",
+            });
           } else {
             setAppStatus("idle");
           }
@@ -242,8 +324,13 @@ export default function SessionScreen({ navigation, route }: any) {
 
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (error) {
-      console.error("Session error:", error);
+      console.error("Recording stop error:", error);
+      recordingRef.current = null;
+      setRecording(null);
       setAppStatus("idle");
+      Alert.alert("Recording Error", "Could not process your speech. Please try again.");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -307,7 +394,7 @@ export default function SessionScreen({ navigation, route }: any) {
             <TouchableOpacity
               onPressIn={handlePressIn}
               onPressOut={handlePressOut}
-              disabled={appStatus === "thinking" || appStatus === "talking"}
+              disabled={appStatus === "thinking" || appStatus === "talking" || isProcessing}
               activeOpacity={0.85}
               style={[styles.micBtn, { backgroundColor: appStatus === "listening" ? "#FF3B30" : themeColor, opacity: appStatus === "thinking" || appStatus === "talking" ? 0.45 : 1 }]}
             >
@@ -317,21 +404,7 @@ export default function SessionScreen({ navigation, route }: any) {
         </View>
       </LinearGradient>
 
-<TouchableOpacity
-  style={styles.testCompleteBtn}
-  onPress={() => navigation.navigate("SessionComplete", {
-    childName,
-    character,
-    exchangeScores: [65, 72, 78],
-    exchangeMetrics: [],
-    sessionTip: "Try to take a breath before speaking",
-  })}
->
-  <Ionicons name="arrow-forward-circle" size={32} color={themeColor} />
-  <Text style={{ color: themeColor, fontSize: 12 }}>Test Complete</Text>
-</TouchableOpacity>
-
-      {/* SIMPLE WORKING MODAL */}
+      {/* Chat Modal */}
       <Modal visible={showChatModal} animationType="slide" transparent onRequestClose={() => setShowChatModal(false)}>
         <View style={{ flex: 1, backgroundColor: 'white', marginTop: 50 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#EEE' }}>
@@ -377,16 +450,6 @@ export default function SessionScreen({ navigation, route }: any) {
 }
 
 const styles = StyleSheet.create({
-  testCompleteBtn: {
-  position: 'absolute',
-  bottom: 10,
-  right: 10,
-  alignItems: 'center',
-  backgroundColor: 'rgba(255,255,255,0.7)',
-  padding: 8,
-  borderRadius: 30,
-  zIndex: 100,
-},
   root: { flex: 1 },
   characterSection: { height: height * 0.6, position: "relative", overflow: "hidden" },
   characterBottomMask: { position: "absolute", bottom: 0, left: 0, right: 0, height: height * 0.22, zIndex: 10 },
@@ -456,112 +519,5 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOpacity: 0.3,
     shadowRadius: 12,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "flex-end",
-  },
-  modalSheet: {
-    backgroundColor: "white",
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    maxHeight: height * 0.78,
-    paddingBottom: Platform.OS === "ios" ? 34 : 20,
-    overflow: "hidden",
-  },
-  modalHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "#DDDDDD",
-    alignSelf: "center",
-    marginTop: 10,
-    marginBottom: 4,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  modalHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
-  modalCharDot: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalCharDotText: {
-    color: "white",
-    fontSize: 16,
-    fontFamily: "Poppins-Bold",
-  },
-  modalTitle: { fontSize: 16, fontFamily: "Poppins-Bold", color: "#1A1A1A" },
-  modalSubtitle: {
-    fontSize: 11,
-    fontFamily: "Poppins-Medium",
-    color: "#AAAAAA",
-  },
-  modalCloseBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#F5F5F5",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalScroll: { flex: 1, paddingHorizontal: 16 },
-  modalScrollContent: { paddingVertical: 16, gap: 10 },
-  emptyChat: { alignItems: "center", paddingVertical: 40, gap: 10 },
-  emptyChatEmoji: { fontSize: 48 },
-  emptyChatText: {
-    fontSize: 14,
-    fontFamily: "Poppins-Medium",
-    color: "#AAAAAA",
-  },
-  msgRow: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
-  aiRow: { alignSelf: "flex-start", maxWidth: "88%" },
-  userRow: {
-    alignSelf: "flex-end",
-    flexDirection: "row-reverse",
-    maxWidth: "78%",
-  },
-  msgAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  msgAvatarText: { color: "white", fontSize: 12, fontFamily: "Poppins-Bold" },
-  msgBubble: { borderRadius: 18, padding: 12, flexShrink: 1 },
-  aiBubble: {
-    backgroundColor: "#F5F5F5",
-    borderTopLeftRadius: 4,
-    borderLeftWidth: 3,
-  },
-  userBubble: { borderTopRightRadius: 4 },
-  msgText: {
-    fontSize: 14,
-    fontFamily: "Poppins-Medium",
-    color: "#2D2D2D",
-    lineHeight: 20,
-  },
-  modalFooter: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderTopWidth: 1,
-    alignItems: "center",
-  },
-  modalFooterText: {
-    fontSize: 12,
-    fontFamily: "Poppins-Medium",
-    color: "#AAAAAA",
   },
 });

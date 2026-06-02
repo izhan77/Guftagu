@@ -1,66 +1,70 @@
-import React, { useState } from "react"
+// src/screens/Parent/ParentPortalScreen.tsx
+import React, { useState } from "react";
 import {
-  View, Text, TextInput, TouchableOpacity,
-  StyleSheet, Alert, ActivityIndicator, Image
-} from "react-native"
-import { SafeAreaView } from "react-native-safe-area-context"
-import { LinearGradient } from "expo-linear-gradient"
-import { Ionicons } from "@expo/vector-icons"
-import { collection, query, where, getDocs } from "firebase/firestore"
-import { db } from "../../services/firebase/config"
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "../../services/firebase/config";
 
 export default function ParentPortalScreen({ navigation }: any) {
-  const [email, setEmail] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
+  const [email, setEmail] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleAccess = async () => {
     if (!email.includes("@")) {
-      Alert.alert("Invalid Email", "Please enter the email you used during setup.")
-      return
+      Alert.alert("Invalid Email", "Please enter the email you used during setup.");
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      // Check if this email exists in consents collection
-      const consentsQ = query(
-        collection(db, "consents"),
-        where("status", "==", "verified")
-      )
-      const snap = await getDocs(consentsQ)
+      // Query parents collection by email
+      const parentsRef = collection(db, "parents");
+      const q = query(parentsRef, where("email", "==", email.trim().toLowerCase()));
+      const querySnapshot = await getDocs(q);
 
-      // Find the child UID associated with this parent
-      let childUid: string | null = null
-      snap.forEach((doc) => {
-        // Note: emails are deleted after verification for COPPA
-        // So we check the parents collection instead
-      })
-
-      // Check parents collection
-      const parentsQ = query(
-        collection(db, "parents"),
-        where("email", "==", email.trim().toLowerCase())
-      )
-      const parentsSnap = await getDocs(parentsQ)
-
-      if (!parentsSnap.empty) {
-        const parentData = parentsSnap.docs[0].data()
-        const linkedChildUid = parentData.linkedChildren?.[0]
-        if (linkedChildUid) {
-          navigation.navigate("ParentDashboard", { childUid: linkedChildUid })
-          return
-        }
+      if (querySnapshot.empty) {
+        Alert.alert(
+          "Not Found",
+          "We couldn't find a parent account linked to this email. Make sure you're using the email entered during setup."
+        );
+        return;
       }
 
-      Alert.alert(
-        "Not Found",
-        "We couldn't find a child profile linked to this email. Make sure you're using the email entered during setup."
-      )
-    } catch (e) {
-      Alert.alert("Error", "Something went wrong. Please try again.")
+      // Get the first matching parent document (email should be unique)
+      const parentDoc = querySnapshot.docs[0];
+      const parentData = parentDoc.data();
+      const linkedChildren = parentData.linkedChildren || [];
+
+      if (linkedChildren.length === 0) {
+        Alert.alert(
+          "No Children Found",
+          "This parent account has no linked children. Please check your setup."
+        );
+        return;
+      }
+
+      // Navigate to ParentDashboardScreen with all child UIDs
+      navigation.navigate("ParentDashboard", {
+        childUids: linkedChildren,
+        parentId: parentDoc.id,
+      });
+    } catch (error) {
+      console.error("Parent portal access error:", error);
+      Alert.alert("Error", "Something went wrong. Please try again.");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <LinearGradient colors={["#F7F2FF", "#FFFFFF"]} style={styles.root}>
@@ -90,6 +94,7 @@ export default function ParentPortalScreen({ navigation }: any) {
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
+              editable={!isLoading}
             />
           </View>
 
@@ -98,10 +103,11 @@ export default function ParentPortalScreen({ navigation }: any) {
             onPress={handleAccess}
             disabled={!email.includes("@") || isLoading}
           >
-            {isLoading
-              ? <ActivityIndicator color="white" />
-              : <Text style={styles.btnText}>View My Child's Progress →</Text>
-            }
+            {isLoading ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={styles.btnText}>View My Child's Progress →</Text>
+            )}
           </TouchableOpacity>
 
           <View style={styles.privacyNote}>
@@ -113,51 +119,70 @@ export default function ParentPortalScreen({ navigation }: any) {
         </View>
       </SafeAreaView>
     </LinearGradient>
-  )
+  );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
   safe: { flex: 1, paddingHorizontal: 24 },
   backBtn: {
-    width: 40, height: 40, borderRadius: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: "#F0EAFF",
-    alignItems: "center", justifyContent: "center",
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: 12,
   },
   content: { flex: 1, justifyContent: "center", alignItems: "center" },
   iconCircle: {
-    width: 80, height: 80, borderRadius: 40,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: "#F0EAFF",
-    alignItems: "center", justifyContent: "center",
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 20,
   },
   title: { fontSize: 28, fontFamily: "Poppins-ExtraBold", color: "#2D2D2D", textAlign: "center" },
   subtitle: {
-    fontSize: 14, fontFamily: "Poppins-Medium",
-    color: "#8A8A8A", textAlign: "center",
-    marginTop: 10, lineHeight: 21, marginBottom: 32,
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#8A8A8A",
+    textAlign: "center",
+    marginTop: 10,
+    lineHeight: 21,
+    marginBottom: 32,
   },
   inputWrapper: {
-    flexDirection: "row", alignItems: "center",
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "white",
-    borderRadius: 16, paddingHorizontal: 16, height: 58,
-    borderWidth: 2, borderColor: "#E8DEFF",
-    width: "100%", marginBottom: 16,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    height: 58,
+    borderWidth: 2,
+    borderColor: "#E8DEFF",
+    width: "100%",
+    marginBottom: 16,
   },
   input: { flex: 1, fontSize: 15, fontFamily: "Poppins-Medium", color: "#2D2D2D" },
   btn: {
-    width: "100%", height: 58,
+    width: "100%",
+    height: 58,
     backgroundColor: "#7C5CBF",
     borderRadius: 18,
-    alignItems: "center", justifyContent: "center",
+    alignItems: "center",
+    justifyContent: "center",
     elevation: 4,
   },
   btnDisabled: { backgroundColor: "#CCCCCC" },
   btnText: { color: "white", fontSize: 15, fontFamily: "Poppins-Bold" },
   privacyNote: {
-    flexDirection: "row", alignItems: "center",
-    gap: 6, marginTop: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 16,
   },
   privacyText: { fontSize: 11, fontFamily: "Poppins-Medium", color: "#AAAAAA" },
-})
+});
