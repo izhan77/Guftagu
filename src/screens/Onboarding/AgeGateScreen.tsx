@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity,
-  StyleSheet, Image, Dimensions, Alert
+  StyleSheet, Image, Dimensions, Alert, ActivityIndicator
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,21 +21,25 @@ const AGE_OPTIONS = [
 
 export default function AgeInputScreen({ navigation }: any) {
   const [selected, setSelected] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleContinue = async () => {
-    if (!selected) return;
+    if (!selected || isLoading) return;
+    
+    setIsLoading(true);
     
     try {
       const { needsParentConsent, age } = await saveAgeConsent(selected);
       
       if (needsParentConsent) {
-        navigation.navigate('ParentConsent', { ageGroup: selected });
+        navigation.replace('ParentConsent', { ageGroup: selected });
       } else {
-        navigation.navigate('NameInput', { ageGroup: selected, coppaRequired: false });
+        navigation.replace('NameInput', { ageGroup: selected, coppaRequired: false });
       }
     } catch (error) {
       console.error('Error:', error);
       Alert.alert('Error', 'Failed to save age. Please try again.');
+      setIsLoading(false);
     }
   };
 
@@ -58,8 +62,8 @@ export default function AgeInputScreen({ navigation }: any) {
           </Text>
         </View>
 
-        {/* Options List */}
-        <View style={styles.optionsContainer}>
+        {/* Options List - Disabled while loading */}
+        <View style={styles.optionsContainer} pointerEvents={isLoading ? "none" : "auto"}>
           {AGE_OPTIONS.map((option) => {
             const isSelected = selected === option.value;
             return (
@@ -67,13 +71,15 @@ export default function AgeInputScreen({ navigation }: any) {
                 key={option.value}
                 style={[
                   styles.option,
-                  isSelected && styles.optionSelected
+                  isSelected && styles.optionSelected,
+                  isLoading && styles.optionDisabled
                 ]}
-                onPress={() => setSelected(option.value)}
+                onPress={() => !isLoading && setSelected(option.value)}
                 activeOpacity={0.7}
+                disabled={isLoading}
               >
                 <View style={[styles.iconWrapper, { backgroundColor: isSelected ? '#7C5CBF20' : option.color + '15' }]}>
-                   <Ionicons 
+                  <Ionicons 
                     name={option.icon as any} 
                     size={26} 
                     color={isSelected ? '#7C5CBF' : option.color} 
@@ -82,7 +88,8 @@ export default function AgeInputScreen({ navigation }: any) {
 
                 <Text style={[
                   styles.optionText,
-                  isSelected && styles.optionTextSelected
+                  isSelected && styles.optionTextSelected,
+                  isLoading && styles.optionTextDisabled
                 ]}>
                   {option.label} years old
                 </Text>
@@ -90,27 +97,36 @@ export default function AgeInputScreen({ navigation }: any) {
                 {isSelected ? (
                   <Ionicons name="checkmark-circle" size={26} color="#7C5CBF" />
                 ) : (
-                   <View style={styles.emptyCircle} />
+                  <View style={styles.emptyCircle} />
                 )}
               </TouchableOpacity>
             );
           })}
         </View>
 
-        {/* Updated Solid Purple Button */}
+        {/* Button with Loading Animation */}
         <TouchableOpacity
           onPress={handleContinue}
-          disabled={!selected}
+          disabled={!selected || isLoading}
           activeOpacity={0.8}
           style={[
             styles.button,
-            { backgroundColor: selected ? '#7C5CBF' : '#D1D1D1' }
+            { backgroundColor: selected && !isLoading ? '#7C5CBF' : '#D1D1D1' }
           ]}
         >
-          <Text style={styles.buttonText}>
-            {selected ? "Let's Go!" : "Pick your age first"}
-          </Text>
-          {selected && <Ionicons name="arrow-forward" size={22} color="white" />}
+          {isLoading ? (
+            <>
+              <ActivityIndicator size="small" color="white" />
+              <Text style={styles.buttonText}>Setting up...</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.buttonText}>
+                {selected ? "Let's Go!" : "Pick your age first"}
+              </Text>
+              {selected && <Ionicons name="arrow-forward" size={22} color="white" />}
+            </>
+          )}
         </TouchableOpacity>
 
       </SafeAreaView>
@@ -174,6 +190,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F7F2FF',
     elevation: 6,
   },
+  optionDisabled: {
+    opacity: 0.6,
+  },
   iconWrapper: {
     width: 48,
     height: 48,
@@ -191,6 +210,9 @@ const styles = StyleSheet.create({
   optionTextSelected: {
     color: '#7C5CBF',
     fontFamily: 'Poppins-Bold',
+  },
+  optionTextDisabled: {
+    opacity: 0.6,
   },
   emptyCircle: {
     width: 24,
