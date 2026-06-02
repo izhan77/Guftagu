@@ -2,8 +2,8 @@
 const ELEVEN_LABS_API_KEY = process.env.ELEVEN_LABS_API_KEY;
 
 const VOICE_IDS: Record<string, string> = {
-  zara: "JBFqnCBsd6RMkjVDRZzb", 
-  robo: "JBFqnCBsd6RMkjVDRZzb", 
+  zara: "EXAVITQu4vr4xnSDxMaL", 
+  robo: "pNInz6obpgDQGcFmaJgB", 
   ustad: "JBFqnCBsd6RMkjVDRZzb"
 };
 
