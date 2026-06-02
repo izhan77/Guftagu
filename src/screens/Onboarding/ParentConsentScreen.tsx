@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,9 +7,24 @@ import { Ionicons } from '@expo/vector-icons';
 export default function ParentConsentScreen({ navigation, route }: any) {
   const { ageGroup } = route.params || { ageGroup: 'Under 14' };
 
+  const handleGoBack = () => {
+    // Check if we can go back
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      // If can't go back, navigate to AgeInput
+      navigation.navigate('AgeInput');
+    }
+  };
+
   return (
     <LinearGradient colors={['#F7F2FF', '#FFFFFF']} style={styles.container}>
       <SafeAreaView style={styles.safe}>
+        {/* Add Back Button at Top Left */}
+        <TouchableOpacity style={styles.backButtonTop} onPress={handleGoBack}>
+          <Ionicons name="arrow-back" size={24} color="#7C5CBF" />
+        </TouchableOpacity>
+
         <ScrollView contentContainerStyle={styles.scroll}>
           
           <View style={styles.shieldCircle}>
@@ -42,7 +57,7 @@ export default function ParentConsentScreen({ navigation, route }: any) {
             <Ionicons name="arrow-forward" size={20} color="white" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <TouchableOpacity style={styles.backButton} onPress={handleGoBack}>
             <Text style={styles.backButtonText}>Go Back</Text>
           </TouchableOpacity>
         </ScrollView>
@@ -54,7 +69,19 @@ export default function ParentConsentScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safe: { flex: 1 },
-  scroll: { alignItems: 'center', padding: 24 },
+  backButtonTop: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(124, 92, 191, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scroll: { alignItems: 'center', padding: 24, paddingTop: 80 },
   shieldCircle: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#7C5CBF15', justifyContent: 'center', alignItems: 'center', marginTop: 20, marginBottom: 20 },
   title: { fontSize: 28, fontFamily: 'Poppins-ExtraBold', color: '#2D2D2D', textAlign: 'center' },
   subtitle: { fontSize: 16, fontFamily: 'Poppins-SemiBold', color: '#8A8A8A', textAlign: 'center', marginTop: 10, lineHeight: 24 },

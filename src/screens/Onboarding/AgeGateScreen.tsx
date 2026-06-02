@@ -32,9 +32,9 @@ export default function AgeInputScreen({ navigation }: any) {
       const { needsParentConsent, age } = await saveAgeConsent(selected);
       
       if (needsParentConsent) {
-        navigation.replace('ParentConsent', { ageGroup: selected });
+        navigation.navigate('ParentConsent', { ageGroup: selected });
       } else {
-        navigation.replace('NameInput', { ageGroup: selected, coppaRequired: false });
+        navigation.navigate('NameInput', { ageGroup: selected, coppaRequired: false });
       }
     } catch (error) {
       console.error('Error:', error);
