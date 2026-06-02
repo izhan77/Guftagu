@@ -15,7 +15,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { doc, updateDoc } from "firebase/firestore";
 import { auth, db } from "../../services/firebase/config";
 import { getLevel } from "../../services/scoring";
-import { saveCompleteSession, SessionData } from "../../services/sessionService";
+import { saveCompleteSession } from "../../services/sessionService";
+import { SessionData } from "../../types/session";
 
 const { width, height } = Dimensions.get("window");
 
@@ -127,7 +128,11 @@ export default function SessionCompleteScreen({ navigation, route }: any) {
 
       } catch (error) {
         console.error("Failed to save session:", error);
-        // Fallback: show error and go to dashboard
+        Alert.alert(
+          "Save Failed",
+          "Your session couldn't be saved. Check your internet connection.",
+          [{ text: "OK", onPress: () => navigation.navigate("Dashboard") }]
+        );
         setNewScore(50);
       } finally {
         // Hold calculating screen for 2.8s, then crossfade

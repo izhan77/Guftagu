@@ -1,0 +1,322 @@
+import {
+  onAuthStateChanged,
+  signInAnonymously,
+  User
+} from 'firebase/auth';
+import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  addDoc,
+  collection,
+  query,
+  where,
+  getDocs
+} from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { auth, db, functions } from './firebase';
+import {
+  saveUserSession,
+  getUserSession,
+  generateAnonId,
+  getCurrentTimestamp,
+  clearUserSession,
+  UserSession
+} from './asyncStorage';
+
+/**
+ * Helper: Ensure user is signed in (anonymously if needed)
+ * Use this at the start of every function that writes to Firestore
+ */
+const ensureAuthenticated = async (): Promise<User> => {
+  let user = auth.currentUser;
+
+  if (!user) {
+    console.log('No user found — signing in anonymously...');
+    const result = await signInAnonymously(auth);
+    user = result.user;
+    console.log(' Signed in anonymously:', user.uid);
+  }
+
+  return user;
+};
+
+/**
+ * SCREEN 1: Check user onboarding status
+ */
+export const checkUserOnboarding = async (): Promise<{
+  route: 'splash' | 'age-gate' | 'dashboard';
+  userData?: UserSession;
+  user?: User;
+}> => {
+  try {
+    const localSession = await getUserSession();
+    if (localSession && localSession.onboardingComplete) {
+      return { route: 'dashboard', userData: localSession };
+    }
+
+    return new Promise((resolve) => {
+      const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        unsubscribe();
+
+        if (!user) {
+          resolve({ route: 'age-gate' });
+          return;
+        }
+
+        try {
+          const userDocRef = doc(db, 'users', user.uid);
+          const userDocSnap = await getDoc(userDocRef);
+
+          if (!userDocSnap.exists()) {
+            resolve({ route: 'age-gate', user });
+            return;
+          }
+
+          const userData = userDocSnap.data();
+          if (userData.onboardingComplete) {
+            resolve({ route: 'dashboard', userData, user });
+          } else {
+            resolve({ route: 'age-gate', user });
+          }
+        } catch (error) {
+          console.error('Error fetching user doc:', error);
+          resolve({ route: 'age-gate', user });
+        }
+      });
+    });
+  } catch (error) {
+    console.error('Error in checkUserOnboarding:', error);
+    return { route: 'age-gate' };
+  }
+};
+
+/**
+ * Helper: Convert age string from UI to number
+ */
+const parseAgeString = (ageString: string): number => {
+  if (ageString === '14+') return 14;
+  const match = ageString.match(/\d+/);
+  return match ? parseInt(match[0], 10) : 0;
+};
+
+/**
+ * SCREEN 2: Save age consent
+ */
+export const saveAgeConsent = async (
+  ageString: string
+): Promise<{ needsParentConsent: boolean; age: number }> => {
+  try {
+    // Always ensure authenticated before writing
+    const user = await ensureAuthenticated();
+
+    const age = parseAgeString(ageString);
+    const needsParentConsent = age < 14;
+
+    const userDocRef = doc(db, 'users', user.uid);
+    const userDocSnap = await getDoc(userDocRef);
+
+    if (!userDocSnap.exists()) {
+      await setDoc(userDocRef, {
+        uid: user.uid,
+        anonId: generateAnonId(),
+        age,
+        ageConsent: true,
+        parentConsent: !needsParentConsent,
+        onboardingComplete: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    } else {
+      await updateDoc(userDocRef, {
+        age,
+        ageConsent: true,
+        parentConsent: !needsParentConsent,
+        updatedAt: new Date(),
+      });
+    }
+
+    const anonId =
+      userDocSnap.exists()
+        ? userDocSnap.data().anonId
+        : generateAnonId();
+
+    await saveUserSession({
+      email: user.email || '',
+      anonId,
+      age,
+      ageConsent: true,
+      parentConsent: !needsParentConsent,
+      timestamp: getCurrentTimestamp(),
+    });
+
+    return { needsParentConsent, age };
+  } catch (error) {
+    console.error('Error saving age consent:', error);
+    throw error;
+  }
+};
+
+/**
+ * SCREEN 3B: Request parent consent
+ */
+export const requestParentConsent = async (
+  parentEmail: string
+): Promise<{ consentId: string; mathQuestion: string }> => {
+  try {
+    // Always ensure authenticated before writing
+    const user = await ensureAuthenticated();
+
+    const sendConsentEmail = httpsCallable(functions, 'sendConsentEmail');
+
+    const result = await sendConsentEmail({
+      parentEmail,
+      childUid: user.uid,
+    });
+
+    const { consentId, mathQuestion } = result.data as {
+      consentId: string;
+      mathQuestion: string;
+    };
+
+    await addDoc(collection(db, 'consents'), {
+      childUid: user.uid,
+      parentEmail,
+      mathQuestion,
+      status: 'pending',
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    });
+
+    await saveUserSession({ email: parentEmail });
+
+    return { consentId, mathQuestion };
+  } catch (error) {
+    console.error('Error requesting parent consent:', error);
+    throw error;
+  }
+};
+
+/**
+ * SCREEN 3C: Verify parent answer
+ */
+export const verifyParentAnswer = async (
+  consentId: string,
+  answer: string
+): Promise<boolean> => {
+  try {
+    // Always ensure authenticated before writing
+    const user = await ensureAuthenticated();
+
+    const verifyConsentAnswer = httpsCallable(functions, 'verifyConsentAnswer');
+
+    const result = await verifyConsentAnswer({
+      consentId,
+      answer: parseInt(answer, 10),
+    });
+
+    const { verified } = result.data as { verified: boolean };
+
+    if (verified) {
+      const userDocRef = doc(db, 'users', user.uid);
+      await updateDoc(userDocRef, {
+        parentConsent: true,
+        updatedAt: new Date(),
+      });
+
+      await saveUserSession({ parentConsent: true });
+
+      const consentsQuery = query(
+        collection(db, 'consents'),
+        where('childUid', '==', user.uid),
+        where('status', '==', 'pending')
+      );
+      const consentsSnapshot = await getDocs(consentsQuery);
+      consentsSnapshot.forEach(async (consentDoc) => {
+        await updateDoc(consentDoc.ref, {
+          status: 'verified',
+          verifiedAt: new Date(),
+        });
+      });
+    }
+
+    return verified;
+  } catch (error) {
+    console.error('Error verifying parent answer:', error);
+    return false;
+  }
+};
+
+/**
+ * SCREEN 4: Save child profile (nickname)
+ */
+export const saveChildProfile = async (nickname: string): Promise<void> => {
+  try {
+    // Always ensure authenticated before writing
+    const user = await ensureAuthenticated();
+
+    const userDocRef = doc(db, 'users', user.uid);
+    const userDocSnap = await getDoc(userDocRef);
+
+    if (!userDocSnap.exists()) {
+      // Document may not exist yet if age step was skipped — create it
+      await setDoc(userDocRef, {
+        uid: user.uid,
+        anonId: generateAnonId(),
+        nickname,
+        onboardingComplete: true,
+        ageConsent: false,
+        parentConsent: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    } else {
+      await updateDoc(userDocRef, {
+        nickname,
+        onboardingComplete: true,
+        updatedAt: new Date(),
+      });
+    }
+
+    await saveUserSession({
+      nickname,
+      onboardingComplete: true,
+    });
+
+    console.log(' Nickname saved to Firestore:', nickname);
+  } catch (error) {
+    console.error('Error saving child profile:', error);
+    throw error;
+  }
+};
+
+/**
+ * Sign out user
+ */
+export const signOutUser = async (): Promise<void> => {
+  try {
+    await clearUserSession();
+  } catch (error) {
+    console.error('Error signing out:', error);
+    throw error;
+  }
+};
+
+/**
+ * Helper: Get current user profile from Firestore
+ */
+export const getCurrentUserProfile = async () => {
+  try {
+    const user = auth.currentUser;
+    if (!user) return null;
+
+    const userDocRef = doc(db, 'users', user.uid);
+    const userDocSnap = await getDoc(userDocRef);
+    return userDocSnap.exists() ? userDocSnap.data() : null;
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    return null;
+  }
+};
+*/

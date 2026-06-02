@@ -2,31 +2,10 @@ import { doc, getDoc, updateDoc, addDoc, collection, Timestamp, runTransaction }
 import { auth, db } from './firebase/config';
 import { getUserSession, saveUserSession } from './asyncStorage';
 import { getLevel } from './scoring';
+import { ExchangeData, SessionData } from '../types/session';
 
-// ============================================================
-// Type Definitions (matching Backend Guide)
-// ============================================================
-
-export interface ExchangeData {
-  exchangeNumber: number;
-  childTranscript: string;
-  wordCount: number;
-  fillerCount: number;
-  sentenceCount: number;
-  avgSentenceLength: number;
-  characterResponse: string;
-  exchangeScore: number;
-  detectedMood?: string;          // optional for Phase 1
-}
-
-export interface SessionData {
-  characterId: string;
-  exchanges: ExchangeData[];
-  totalDuration: number;          // in seconds
-  moodStart?: string;
-  moodEnd?: string;
-  topics: string[];               // e.g. ["My School", "Biryani"]
-}
+// Re-export types for backward compatibility
+export { ExchangeData, SessionData };
 
 // ============================================================
 // Bond Helpers (simple Phase 1 logic)

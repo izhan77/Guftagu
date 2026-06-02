@@ -365,7 +365,7 @@ export const linkChildToParent = async (
 ): Promise<string> => {
   // Check if parent already exists
   const parentsRef = collection(db, 'parents');
-  const q = query(parentsRef, where('email', '==', parentEmail));
+  const q = query(parentsRef, where('email', '==', parentEmail.toLowerCase()));
   const querySnapshot = await getDocs(q);
   
   let parentId: string;
@@ -374,11 +374,14 @@ export const linkChildToParent = async (
     // Parent exists - add child to existing parent
     const parentDoc = querySnapshot.docs[0];
     parentId = parentDoc.id;
-    const existingChildren = parentDoc.data().linkedChildren || [];
-    await updateDoc(doc(db, 'parents', parentId), {
-      linkedChildren: [...existingChildren, childUid],
-      updatedAt: Timestamp.now()
-    });
+  const existingChildren = parentDoc.data().linkedChildren || [];
+const updatedChildren = existingChildren.includes(childUid)
+  ? existingChildren
+  : [...existingChildren, childUid];
+await updateDoc(doc(db, 'parents', parentId), {
+  linkedChildren: updatedChildren,
+  updatedAt: Timestamp.now()
+});
   } else {
     // Create new parent account (no password yet - will be set later)
     const newParentRef = await addDoc(collection(db, 'parents'), {

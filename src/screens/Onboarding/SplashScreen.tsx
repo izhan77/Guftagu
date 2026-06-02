@@ -26,11 +26,7 @@ export default function SplashScreen({ navigation }: any) {
         
         // If user already completed onboarding, go straight to character select
         if (isSessionFullyOnboarded(session)) {
-          navigation.replace('CharacterSelect', {
-            name: session!.nickname!.trim(),
-            ageGroup: ageGroupLabelFromSession(session!.age),
-            fromOnboarding: false, 
-          });
+          navigation.replace('Dashboard');
           return;
         }
       } catch (e) {
