@@ -216,21 +216,34 @@ export const verifyParentAnswer = async (consentId: string, answer: string): Pro
   
   if (!isCorrect) return false;
   
+  // Store parentEmail before it's deleted
+  const parentEmail = data.parentEmail;
+  
   // Update consent status
   await updateDoc(consentRef, { status: 'verified', verifiedAt: Timestamp.now() });
   
-  // Update user document
+  // Update user document with parent consent
   const userRef = doc(db, 'users', user.uid);
   await updateDoc(userRef, {
     parentConsent: true,
     consentVerifiedAt: Timestamp.now(),
   });
   
-  // ✅ FIX THIS - Delete BOTH email fields
+  // Link child to parent (if email exists)
+  if (parentEmail) {
+    try {
+      await linkChildToParent(parentEmail, user.uid);
+      console.log(`Child ${user.uid} linked to parent email ${parentEmail}`);
+    } catch (error) {
+      console.error('Failed to link child to parent:', error);
+      // Continue – child can still use app, but parent portal may not work
+    }
+  }
+  
+  // Delete sensitive data from child's document (COPPA)
   await updateDoc(userRef, {
-    pendingParentEmail: deleteField(),  // Delete this
-    // parentEmail: deleteField(),       // Also delete if exists
-    consentId: deleteField(),            // Also delete consentId reference
+    pendingParentEmail: deleteField(),
+    consentId: deleteField(),
   });
   
   // Delete sensitive data from consent document
@@ -239,6 +252,7 @@ export const verifyParentAnswer = async (consentId: string, answer: string): Pro
     mathAnswer: deleteField(),
   });
   
+  // Update local AsyncStorage
   await saveUserSession({ parentConsent: true });
   
   return true;
