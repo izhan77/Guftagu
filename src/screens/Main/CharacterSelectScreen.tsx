@@ -1,4 +1,3 @@
-// src/screens/Main/CharacterSelectScreen.tsx
 import React, { useState, useRef, useEffect } from "react";
 import {
   View,
@@ -13,6 +12,8 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { auth, db } from "../../services/firebase/config";
 import { useFirestoreSync } from "../../hooks/useFirestoreSync";
 
 const { width, height } = Dimensions.get("window");
@@ -67,7 +68,6 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
       : 0,
   );
 
-  // Add Firestore listener to detect if data was deleted
   useFirestoreSync(navigation);
 
   // Animation Refs
@@ -77,7 +77,6 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
 
   const current = CHARACTERS[index];
 
-  // Continuous Floating Animation
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
@@ -135,13 +134,59 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
     outputRange: [0, -15],
   });
 
+  // ─── Handle character selection (bond reset on switch) ───
+  const handlePickCharacter = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      // No authenticated user – proceed to session anyway (unlikely)
+      navigation.navigate("Session", {
+        childName: childName,
+        ageGroup: ageGroup,
+        character: current,
+      });
+      return;
+    }
+
+    try {
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+      const currentCharacter = userSnap.data()?.chosenCharacter;
+
+      // If switching to a different character, reset bond to 10
+      if (currentCharacter && currentCharacter !== current.id) {
+        await updateDoc(userRef, {
+          characterBondLevel: 10,
+          characterBondTier: "New",
+        });
+        console.log(`Switched from ${currentCharacter} to ${current.id} – bond reset to 10`);
+      } else if (!currentCharacter) {
+        // First character ever – initialize bond
+        await updateDoc(userRef, {
+          characterBondLevel: 10,
+          characterBondTier: "New",
+        });
+        console.log("First character selected – bond initialized to 10");
+      }
+      // If same character, bond stays as is (no reset)
+    } catch (error) {
+      console.error("Failed to handle bond on character selection:", error);
+      // Still allow navigation even if bond update fails
+    }
+
+    // Navigate to session (character is NOT saved here)
+    navigation.navigate("Session", {
+      childName: childName,
+      ageGroup: ageGroup,
+      character: current,
+    });
+  };
+
   return (
     <LinearGradient
       colors={[current.gradientTop, current.gradientBottom]}
       style={styles.container}
     >
       <SafeAreaView style={styles.safe}>
-        {/* ✅ Show back button ONLY when coming from onboarding */}
         {fromOnboarding && (
           <TouchableOpacity
             style={styles.backBtnContainer}
@@ -152,13 +197,11 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
           </TouchableOpacity>
         )}
 
-        {/* Header Section */}
         <View style={styles.header}>
           <Text style={styles.greeting}>Hey {childName}! 👋</Text>
           <Text style={styles.title}>Who's your speaking buddy?</Text>
         </View>
 
-        {/* Character Stage */}
         <View style={styles.characterStage}>
           <View style={styles.watermarkWrapper} pointerEvents="none">
             <Animated.Text style={[styles.watermark, { opacity: fadeAnim }]}>
@@ -167,7 +210,6 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
           </View>
 
           <View style={styles.stageContent}>
-            {/* Left Nav */}
             <TouchableOpacity
               onPress={() => index > 0 && animateSwitch(index - 1, "right")}
               style={[styles.navBtn, index === 0 && { opacity: 0 }]}
@@ -207,7 +249,6 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
               />
             </View>
 
-            {/* Right Nav */}
             <TouchableOpacity
               onPress={() =>
                 index < CHARACTERS.length - 1 &&
@@ -223,7 +264,6 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
           </View>
         </View>
 
-        {/* Bottom Floating Island Card */}
         <View style={styles.infoCard}>
           <View
             style={[
@@ -239,7 +279,6 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
           <Text style={styles.charName}>{current.name}</Text>
           <Text style={styles.charTagline}>{current.tagline}</Text>
 
-          {/* Morphing Dots */}
           <View style={styles.dotContainer}>
             {CHARACTERS.map((_, i) => (
               <View
@@ -259,13 +298,7 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
               styles.mainButton,
               { backgroundColor: current.buttonColor },
             ]}
-            onPress={() =>
-              navigation.navigate("Session", {
-                childName: childName,
-                ageGroup: ageGroup,
-                character: current,
-              })
-            }
+            onPress={handlePickCharacter}
           >
             <Text style={styles.buttonText}>Pick {current.name}!</Text>
             <Ionicons name="arrow-forward" size={22} color="white" />
