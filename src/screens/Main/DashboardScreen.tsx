@@ -41,17 +41,10 @@ const CHAR_IMAGES: Record<string, any> = {
   ustad: require("../../../assets/characters/ustad_sahab.png"),
 };
 
-const CHAR_COLORS: Record<string, [string, string]> = {
-  zara: ["#7C5CBF", "#7C5CBF"],
-  robo: ["#2980B9", "#1A5276"],
-  ustad: ["#27AE60", "#1E8449"],
-};
-
-const CHAR_BG_COLORS: Record<string, string> = {
-  zara: "#F3E8FF",
-  robo: "#E8F4FF",
-  ustad: "#E8FFF3",
-};
+// 🟣 CONSISTENT PURPLE THEME - NOT CHARACTER DEPENDENT
+const PRIMARY_COLOR = "#7C5CBF";
+const PRIMARY_GRADIENT: [string, string] = ["#7C5CBF", "#5A3D9A"];
+const BG_COLOR = "#F3E8FF";
 
 const CHAR_LABELS: Record<string, string> = {
   zara: "Zara",
@@ -69,7 +62,7 @@ const DAILY_PROMPTS = [
 ];
 
 // Helper component
-function ConfidencePill({ value, color }: { value: number; color: string }) {
+function ConfidencePill({ value }: { value: number; color: string }) {
   const getLabel = (v: number) =>
     v >= 85 ? "Superstar! ⭐" : v >= 70 ? "Great Job! 🎉" : "Keep Going! 💪";
   const getBg = (v: number) =>
@@ -177,9 +170,8 @@ function DashboardSkeleton() {
   });
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#F3E8FF" }}>
+    <View style={{ flex: 1, backgroundColor: BG_COLOR }}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* ── Hero skeleton ── */}
         <Animated.View style={{ opacity: headerOpacity }}>
           <LinearGradient
             colors={["#C4B0E8", "#D4C4F0"]}
@@ -192,10 +184,8 @@ function DashboardSkeleton() {
                   <Bone w={160} h={32} radius={10} style={{ marginTop: 4 }} />
                   <Bone w={110} h={26} radius={13} style={{ marginTop: 6 }} />
                 </View>
-                {/* Avatar */}
                 <View style={skeletonStyles.avatarSkel} />
               </View>
-              {/* Streak bar */}
               <View style={skeletonStyles.streakSkel}>
                 <Bone w={24} h={24} radius={12} />
                 <Bone w="60%" h={14} radius={7} />
@@ -209,7 +199,6 @@ function DashboardSkeleton() {
           </LinearGradient>
         </Animated.View>
 
-        {/* ── Stats row skeleton ── */}
         <View style={skeletonStyles.statsRow}>
           {[0, 1, 2].map((i) => (
             <View key={i} style={skeletonStyles.statCardSkel}>
@@ -220,7 +209,6 @@ function DashboardSkeleton() {
           ))}
         </View>
 
-        {/* ── Confidence card skeleton ── */}
         <View style={skeletonStyles.card}>
           <View style={skeletonStyles.cardHeader}>
             <Bone w={170} h={18} radius={9} />
@@ -244,7 +232,6 @@ function DashboardSkeleton() {
           </View>
         </View>
 
-        {/* ── Challenge card skeleton ── */}
         <View style={skeletonStyles.challengeSkel}>
           <View style={{ flex: 1, gap: 10 }}>
             <Bone w={120} h={26} radius={13} />
@@ -255,7 +242,6 @@ function DashboardSkeleton() {
           <Bone w={56} h={56} radius={28} style={{ marginLeft: 12 }} />
         </View>
 
-        {/* ── Learning progress skeleton ── */}
         <View style={skeletonStyles.card}>
           <View style={skeletonStyles.cardHeader}>
             <Bone w={190} h={18} radius={9} />
@@ -277,7 +263,6 @@ function DashboardSkeleton() {
           <Bone w="100%" h={44} radius={14} style={{ marginTop: 8 }} />
         </View>
 
-        {/* ── Buddies skeleton ── */}
         <View style={skeletonStyles.card}>
           <Bone w={210} h={18} radius={9} style={{ marginBottom: 16 }} />
           <View style={skeletonStyles.buddiesRow}>
@@ -291,7 +276,6 @@ function DashboardSkeleton() {
           </View>
         </View>
 
-        {/* Parent portal */}
         <View style={skeletonStyles.parentRow}>
           <Bone w={18} h={18} radius={9} />
           <Bone w={100} h={14} radius={7} />
@@ -449,7 +433,6 @@ export default function DashboardScreen({ navigation }: any) {
       }),
     ]).start();
 
-    // FAB heartbeat
     Animated.loop(
       Animated.sequence([
         Animated.timing(fabPulse, {
@@ -472,10 +455,8 @@ export default function DashboardScreen({ navigation }: any) {
       const localSession = await getUserSession();
       
       if (user) {
-        // Fetch user document
         const userSnap = await getDoc(doc(db, "users", user.uid));
         
-        // If user document doesn't exist, sign out and restart
         if (!userSnap.exists()) {
           console.log("User document not found - signing out");
           await signOut(auth);
@@ -490,7 +471,6 @@ export default function DashboardScreen({ navigation }: any) {
         const data = userSnap.data();
         setUserData(data);
         
-        // Fetch recent sessions (last 5 for learning progress)
         const sessionsQ = query(
           collection(db, "sessions"),
           where("childUid", "==", user.uid),
@@ -501,7 +481,6 @@ export default function DashboardScreen({ navigation }: any) {
         const recent = sessionsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
         setRecentSessions(recent);
         
-        // Fetch all sessions for modal (limit to 20)
         const allSessionsQ = query(
           collection(db, "sessions"),
           where("childUid", "==", user.uid),
@@ -552,8 +531,6 @@ export default function DashboardScreen({ navigation }: any) {
   const streak = userData?.sessionStreak ?? 0;
   const totalSessions = userData?.totalSessions ?? 0;
   const charId = userData?.chosenCharacter || "zara";
-  const [colorA, colorB] = CHAR_COLORS[charId] || CHAR_COLORS.zara;
-  const bgColor = CHAR_BG_COLORS[charId] || "#F3E8FF";
   const level = getLevel(score);
   const hour = new Date().getHours();
   const greeting =
@@ -563,7 +540,7 @@ export default function DashboardScreen({ navigation }: any) {
         ? "Good Afternoon 🌤️"
         : "Good Evening 🌙";
 
-  // Build topics from real sessions (no mock data)
+  // Build topics from real sessions
   const topics = recentSessions.length > 0
     ? recentSessions.map((s, i) => ({
         id: s.id,
@@ -574,7 +551,7 @@ export default function DashboardScreen({ navigation }: any) {
       }))
     : [];
 
-  // Build all chats for modal from real sessions
+  // Build all chats for modal
   const allChats = allSessions.map((s) => ({
     id: s.id,
     topic: s.topics?.[0] || "General Conversation",
@@ -585,18 +562,18 @@ export default function DashboardScreen({ navigation }: any) {
   }));
 
   return (
-    <View style={[styles.root, { backgroundColor: bgColor }]}>
+    <View style={[styles.root, { backgroundColor: BG_COLOR }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colorA}
+            tintColor={PRIMARY_COLOR}
           />
         }
       >
-        {/* ══════════ HERO HEADER ══════════ */}
+        {/* ══════════ HERO HEADER - PURPLE THEME ══════════ */}
         <Animated.View
           style={{
             opacity: headerAnim,
@@ -611,18 +588,16 @@ export default function DashboardScreen({ navigation }: any) {
           }}
         >
           <LinearGradient
-            colors={[colorA, colorB]}
+            colors={PRIMARY_GRADIENT}
             style={styles.hero}
             start={{ x: 0.1, y: 0 }}
             end={{ x: 0.9, y: 1 }}
           >
-            {/* Decorative blobs */}
             <View style={styles.blobTR} />
             <View style={styles.blobBL} />
 
             <SafeAreaView>
               <View style={styles.heroContent}>
-                {/* Left: greeting + name */}
                 <View style={styles.heroLeft}>
                   <Text style={styles.greetingSmall}>{greeting}</Text>
                   <Text style={styles.heroName}>{nickname}!</Text>
@@ -632,7 +607,6 @@ export default function DashboardScreen({ navigation }: any) {
                   </View>
                 </View>
 
-                {/* Right: Avatar circle */}
                 <View style={styles.avatarWrap}>
                   <LinearGradient
                     colors={[
@@ -653,7 +627,7 @@ export default function DashboardScreen({ navigation }: any) {
           </LinearGradient>
         </Animated.View>
 
-        {/* ══════════ STAT CARDS ══════════ */}
+        {/* ══════════ STAT CARDS - PURPLE THEME ══════════ */}
         <Animated.View
           style={[
             styles.statsRow,
@@ -675,7 +649,7 @@ export default function DashboardScreen({ navigation }: any) {
               emoji: "🎯",
               value: score,
               label: "My Score",
-              grad: [colorA, colorB] as [string, string],
+              grad: PRIMARY_GRADIENT,
             },
             {
               emoji: "🔥",
@@ -704,19 +678,18 @@ export default function DashboardScreen({ navigation }: any) {
           ))}
         </Animated.View>
 
-        {/* ══════════ CONFIDENCE METER ══════════ */}
+        {/* ══════════ CONFIDENCE METER - PURPLE THEME ══════════ */}
         <Animated.View style={[styles.card, { opacity: cardAnim }]}>
           <View style={styles.cardHeaderRow}>
             <Text style={styles.cardTitle}>My Confidence 📈</Text>
-            <View style={[styles.scorePill, { backgroundColor: colorA }]}>
+            <View style={[styles.scorePill, { backgroundColor: PRIMARY_COLOR }]}>
               <Text style={styles.scorePillText}>{score} / 100</Text>
             </View>
           </View>
 
-          {/* Big chunky progress bar */}
           <View style={styles.progressTrack}>
             <LinearGradient
-              colors={[colorA, colorB]}
+              colors={PRIMARY_GRADIENT}
               style={[styles.progressFill, { width: `${score}%` }]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -729,14 +702,13 @@ export default function DashboardScreen({ navigation }: any) {
             <Text style={styles.progressLabelText}>Voice Champion</Text>
           </View>
 
-          {/* Milestone dots */}
           <View style={styles.milestones}>
             {[25, 50, 75, 100].map((m) => (
               <View
                 key={m}
                 style={[
                   styles.milestone,
-                  score >= m && { backgroundColor: colorA },
+                  score >= m && { backgroundColor: PRIMARY_COLOR },
                 ]}
               >
                 <Text
@@ -797,11 +769,11 @@ export default function DashboardScreen({ navigation }: any) {
             <Text style={{ textAlign: "center", marginVertical: 20, color: "#AAA" }}>No sessions yet. Start talking!</Text>
           ) : (
             topics.map((t, i) => {
-              const [tc1, tc2] = CHAR_COLORS[t.charId] || CHAR_COLORS.zara;
+              // Character colors only for avatars, not for theme
+              const charColor = t.charId === "zara" ? "#7C5CBF" : t.charId === "robo" ? "#2196F3" : "#4CAF50";
               return (
                 <View key={t.id} style={styles.topicRow}>
-                  {/* Character mini avatar */}
-                  <LinearGradient colors={[tc1, tc2]} style={styles.topicCharDot}>
+                  <LinearGradient colors={[charColor, charColor]} style={styles.topicCharDot}>
                     <Image
                       source={CHAR_IMAGES[t.charId]}
                       style={styles.topicCharImg}
@@ -813,7 +785,7 @@ export default function DashboardScreen({ navigation }: any) {
                     <Text style={styles.topicName}>{t.topic}</Text>
                     <View style={styles.topicBarTrack}>
                       <LinearGradient
-                        colors={[tc1, tc2]}
+                        colors={[charColor, charColor]}
                         style={[
                           styles.topicBarFill,
                           { width: `${t.confidence}%` },
@@ -826,26 +798,25 @@ export default function DashboardScreen({ navigation }: any) {
                   </View>
 
                   <View style={styles.topicRight}>
-                    <Text style={[styles.topicScore, { color: tc1 }]}>
+                    <Text style={[styles.topicScore, { color: charColor }]}>
                       {t.confidence}%
                     </Text>
-                    <ConfidencePill value={t.confidence} color={tc1} />
+                    <ConfidencePill value={t.confidence} color={charColor} />
                   </View>
                 </View>
               );
             })
           )}
 
-          {/* Show More button */}
           <TouchableOpacity
-            style={[styles.showMoreBtn, { borderColor: colorA }]}
+            style={[styles.showMoreBtn, { borderColor: PRIMARY_COLOR }]}
             onPress={() => setShowChatsModal(true)}
             activeOpacity={0.8}
           >
-            <Text style={[styles.showMoreText, { color: colorA }]}>
+            <Text style={[styles.showMoreText, { color: PRIMARY_COLOR }]}>
               + Show More Chats
             </Text>
-            <Ionicons name="chevron-down" size={16} color={colorA} />
+            <Ionicons name="chevron-down" size={16} color={PRIMARY_COLOR} />
           </TouchableOpacity>
         </Animated.View>
 
@@ -854,14 +825,14 @@ export default function DashboardScreen({ navigation }: any) {
           <Text style={styles.cardTitle}>My Speaking Buddies</Text>
           <View style={styles.buddiesRow}>
             {(["zara", "robo", "ustad"] as const).map((id) => {
-              const [bc1, bc2] = CHAR_COLORS[id];
+              const charColor = id === "zara" ? "#7C5CBF" : id === "robo" ? "#2196F3" : "#4CAF50";
               const isActive = charId === id;
               return (
                 <TouchableOpacity
                   key={id}
                   style={[
                     styles.buddyCard,
-                    isActive && { borderColor: bc1, borderWidth: 3 },
+                    isActive && { borderColor: PRIMARY_COLOR, borderWidth: 3 },
                   ]}
                   onPress={() =>
                     navigation.navigate("CharacterSelect", {
@@ -875,7 +846,7 @@ export default function DashboardScreen({ navigation }: any) {
                 >
                   {isActive && (
                     <LinearGradient
-                      colors={[bc1 + "22", bc2 + "22"]}
+                      colors={[PRIMARY_COLOR + "22", PRIMARY_COLOR + "22"]}
                       style={StyleSheet.absoluteFill}
                     />
                   )}
@@ -889,14 +860,14 @@ export default function DashboardScreen({ navigation }: any) {
                       <View
                         style={[
                           styles.buddyActiveBadge,
-                          { backgroundColor: bc1 },
+                          { backgroundColor: PRIMARY_COLOR },
                         ]}
                       >
                         <Text style={{ fontSize: 8 }}>✓</Text>
                       </View>
                     )}
                   </View>
-                  <Text style={[styles.buddyName, isActive && { color: bc1 }]}>
+                  <Text style={[styles.buddyName, isActive && { color: PRIMARY_COLOR }]}>
                     {CHAR_LABELS[id]}
                   </Text>
                 </TouchableOpacity>
@@ -919,7 +890,7 @@ export default function DashboardScreen({ navigation }: any) {
               end={{ x: 1, y: 1 }}
             >
               <View style={styles.parentPortalIconWrap}>
-                <Ionicons name="shield-checkmark" size={28} color="#7C5CBF" />
+                <Ionicons name="shield-checkmark" size={28} color={PRIMARY_COLOR} />
               </View>
               <View style={styles.parentPortalText}>
                 <Text style={styles.parentPortalTitle}>Parent Portal</Text>
@@ -927,7 +898,7 @@ export default function DashboardScreen({ navigation }: any) {
                   View your child's full progress & reports
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={22} color="#7C5CBF" />
+              <Ionicons name="chevron-forward" size={22} color={PRIMARY_COLOR} />
             </LinearGradient>
           </TouchableOpacity>
         )}
@@ -935,7 +906,7 @@ export default function DashboardScreen({ navigation }: any) {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* ══════════ FAB ══════════ */}
+      {/* ══════════ FAB - PURPLE THEME ══════════ */}
       <Animated.View
         style={[styles.fabWrap, { transform: [{ scale: fabPulse }] }]}
       >
@@ -949,7 +920,7 @@ export default function DashboardScreen({ navigation }: any) {
           }
           activeOpacity={0.9}
         >
-          <LinearGradient colors={[colorA, colorB]} style={styles.fab}>
+          <LinearGradient colors={PRIMARY_GRADIENT} style={styles.fab}>
             <Ionicons name="mic" size={30} color="white" />
             <Text style={styles.fabLabel}>Talk!</Text>
           </LinearGradient>
@@ -965,7 +936,6 @@ export default function DashboardScreen({ navigation }: any) {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
-            {/* Handle */}
             <View style={styles.modalHandle} />
 
             <View style={styles.modalHeader}>
@@ -988,11 +958,11 @@ export default function DashboardScreen({ navigation }: any) {
               contentContainerStyle={{ paddingBottom: 20 }}
               ListEmptyComponent={<Text style={{ textAlign: "center", marginTop: 40, color: "#AAA" }}>No sessions yet. Start talking!</Text>}
               renderItem={({ item }) => {
-                const [mc1, mc2] = CHAR_COLORS[item.charId] || CHAR_COLORS.zara;
+                const charColor = item.charId === "zara" ? "#7C5CBF" : item.charId === "robo" ? "#2196F3" : "#4CAF50";
                 return (
                   <View style={styles.modalChatRow}>
                     <LinearGradient
-                      colors={[mc1, mc2]}
+                      colors={[charColor, charColor]}
                       style={styles.modalChatIcon}
                     >
                       <Image
@@ -1009,7 +979,7 @@ export default function DashboardScreen({ navigation }: any) {
                       </Text>
                       <View style={styles.modalMiniBar}>
                         <LinearGradient
-                          colors={[mc1, mc2]}
+                          colors={[charColor, charColor]}
                           style={[
                             styles.modalMiniBarFill,
                             { width: `${item.confidence}%` },
@@ -1019,7 +989,7 @@ export default function DashboardScreen({ navigation }: any) {
                         />
                       </View>
                     </View>
-                    <Text style={[styles.modalChatScore, { color: mc1 }]}>
+                    <Text style={[styles.modalChatScore, { color: charColor }]}>
                       {item.confidence}%
                     </Text>
                   </View>
@@ -1036,11 +1006,7 @@ export default function DashboardScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-
-  // Loading (skeleton replaces this — kept for safety)
   loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
-
-  // Hero Header
   hero: {
     paddingHorizontal: 22,
     paddingBottom: 28,
@@ -1097,8 +1063,6 @@ const styles = StyleSheet.create({
   },
   levelBadgeEmoji: { fontSize: 16 },
   levelBadgeText: { fontSize: 14, fontFamily: "Poppins-Bold", color: "white" },
-
-  // Avatar
   avatarWrap: { position: "relative", marginLeft: 12 },
   avatarGlowRing: {
     width: 96,
@@ -1115,39 +1079,6 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: "rgba(255,255,255,0.8)",
   },
-  onlineDot: {
-    position: "absolute",
-    bottom: 4,
-    right: 4,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: "#2ECC71",
-    borderWidth: 3,
-    borderColor: "white",
-  },
-
-  // Streak banner
-  streakBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginTop: 14,
-  },
-  streakFire: { fontSize: 22 },
-  streakText: {
-    flex: 1,
-    fontSize: 14,
-    fontFamily: "Poppins-Bold",
-    color: "white",
-  },
-  streakStars: { flexDirection: "row", gap: 2 },
-
-  // Stats
   statsRow: {
     flexDirection: "row",
     marginHorizontal: 16,
@@ -1172,8 +1103,6 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.85)",
     marginTop: 2,
   },
-
-  // Generic card
   card: {
     backgroundColor: "white",
     borderRadius: 26,
@@ -1196,8 +1125,6 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-ExtraBold",
     color: "#1A1A2E",
   },
-
-  // Confidence
   scorePill: { paddingHorizontal: 14, paddingVertical: 5, borderRadius: 99 },
   scorePillText: { fontSize: 14, fontFamily: "Poppins-Bold", color: "white" },
   progressTrack: {
@@ -1239,8 +1166,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   milestoneText: { fontSize: 13, fontFamily: "Poppins-Bold", color: "#BBBBBB" },
-
-  // Challenge
   challengeCard: {
     borderRadius: 26,
     padding: 22,
@@ -1286,8 +1211,6 @@ const styles = StyleSheet.create({
     color: "#FF6B00",
   },
   challengeBigEmoji: { fontSize: 56, marginLeft: 10 },
-
-  // Topics
   topicRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1320,7 +1243,6 @@ const styles = StyleSheet.create({
   topicDate: { fontSize: 11, fontFamily: "Poppins-Medium", color: "#BBBBBB" },
   topicRight: { alignItems: "flex-end", gap: 4 },
   topicScore: { fontSize: 18, fontFamily: "Poppins-ExtraBold" },
-
   showMoreBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -1332,8 +1254,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   showMoreText: { fontSize: 14, fontFamily: "Poppins-Bold" },
-
-  // Buddies
   buddiesRow: { flexDirection: "row", gap: 10, marginTop: 12 },
   buddyCard: {
     flex: 1,
@@ -1366,8 +1286,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
     textAlign: "center",
   },
-
-  // Parent portal card
   parentPortalCard: {
     marginHorizontal: 16,
     marginTop: 24,
@@ -1408,8 +1326,6 @@ const styles = StyleSheet.create({
     color: "#9A8AB0",
     marginTop: 2,
   },
-
-  // FAB
   fabWrap: {
     position: "absolute",
     bottom: 28,
@@ -1432,8 +1348,6 @@ const styles = StyleSheet.create({
     color: "white",
     marginTop: -2,
   },
-
-  // Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.45)",

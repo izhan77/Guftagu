@@ -332,7 +332,10 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
         {/* FAB Button to Dashboard - Only shows if child has existing character */}
         {hasExistingCharacter && !fromOnboarding && (
           <TouchableOpacity style={styles.dashboardFab} onPress={goToDashboard} activeOpacity={0.9}>
-            <LinearGradient colors={["#7C5CBF", "#5A3D9A"]} style={styles.dashboardFabGradient}>
+            <LinearGradient 
+              colors={[current.buttonColor, current.buttonColor + "CC"]} 
+              style={styles.dashboardFabGradient}
+            >
               <Ionicons name="home-outline" size={22} color="white" />
               <Text style={styles.dashboardFabText}>Dashboard</Text>
             </LinearGradient>
@@ -439,7 +442,7 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     padding: 24,
     alignItems: "center",
-    marginBottom: 50,
+    marginBottom: 70,
     elevation: 8,
     shadowColor: "#000",
     shadowOpacity: 0.1,
