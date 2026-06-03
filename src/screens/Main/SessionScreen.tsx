@@ -58,6 +58,7 @@ const CHAR_CONFIG: Record<
   },
 };
 
+const MIN_RECORDING_DURATION = 800; // Minimum recording duration in ms (0.8 seconds)
 const MAX_EXCHANGES = 5;
 
 export default function SessionScreen({ navigation, route }: any) {
@@ -74,6 +75,7 @@ export default function SessionScreen({ navigation, route }: any) {
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const recordingRef = useRef<Audio.Recording | null>(null);
+  const recordingStartTime = useRef<number>(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [openingShown, setOpeningShown] = useState(false);
   const [exchangeCount, setExchangeCount] = useState(0);
@@ -82,9 +84,10 @@ export default function SessionScreen({ navigation, route }: any) {
   const [exchangeHistory, setExchangeHistory] = useState<ExchangeData[]>([]);
   const sessionStartTime = useRef<number>(Date.now());
 
+  // Animation refs
   const micScale = useRef(new Animated.Value(1)).current;
   const micGlowAnim = useRef(new Animated.Value(0)).current;
-  const pulseRef = useRef<any>(null);
+  const recordingPulse = useRef<any>(null);
   const timerRef = useRef<any>(null);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -114,7 +117,6 @@ export default function SessionScreen({ navigation, route }: any) {
     }
   }, [appStatus]);
 
-  // Cleanup effect
   useEffect(() => {
     return () => {
       if (sound) {
@@ -127,6 +129,7 @@ export default function SessionScreen({ navigation, route }: any) {
         recordingRef.current = null;
       }
       if (timerRef.current) clearTimeout(timerRef.current);
+      if (recordingPulse.current) recordingPulse.current.stop();
       try { idlePlayer.pause(); } catch (_) {}
       try { talkPlayer.pause(); } catch (_) {}
     };
@@ -146,36 +149,42 @@ export default function SessionScreen({ navigation, route }: any) {
     }
   }, []);
 
-  const startMicPulse = () => {
-    pulseRef.current = Animated.loop(
+  const startRecordingAnimation = () => {
+    // Continuous pulse animation while recording
+    recordingPulse.current = Animated.loop(
       Animated.sequence([
         Animated.parallel([
-          Animated.timing(micScale, { toValue: 1.2, duration: 600, useNativeDriver: true }),
-          Animated.timing(micGlowAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+          Animated.timing(micScale, { toValue: 1.15, duration: 500, useNativeDriver: true }),
+          Animated.timing(micGlowAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
         ]),
         Animated.parallel([
-          Animated.timing(micScale, { toValue: 1, duration: 600, useNativeDriver: true }),
-          Animated.timing(micGlowAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
+          Animated.timing(micScale, { toValue: 1, duration: 500, useNativeDriver: true }),
+          Animated.timing(micGlowAnim, { toValue: 0.4, duration: 500, useNativeDriver: true }),
         ]),
       ])
     );
-    pulseRef.current.start();
+    recordingPulse.current.start();
   };
 
-  const stopMicPulse = () => {
-    pulseRef.current?.stop();
+  const stopRecordingAnimation = () => {
+    if (recordingPulse.current) {
+      recordingPulse.current.stop();
+    }
     Animated.parallel([
-      Animated.timing(micScale, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.spring(micScale, { toValue: 1, tension: 40, friction: 7, useNativeDriver: true }),
       Animated.timing(micGlowAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
     ]).start();
   };
 
-  const handlePressIn = async () => {
-    if (isProcessing) return;
+  const startRecording = async () => {
+    if (isProcessing || appStatus === "thinking" || appStatus === "talking") {
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
-      // Clean up any existing recording before starting a new one
+      // Clean up any existing recording
       if (recordingRef.current) {
         try {
           await recordingRef.current.stopAndUnloadAsync();
@@ -187,6 +196,7 @@ export default function SessionScreen({ navigation, route }: any) {
       const { status } = await Audio.requestPermissionsAsync();
       if (status !== "granted") {
         Alert.alert("Permission required", "Microphone access is needed for speaking practice.");
+        setIsProcessing(false);
         return;
       }
 
@@ -200,8 +210,9 @@ export default function SessionScreen({ navigation, route }: any) {
       );
       recordingRef.current = newRecording;
       setRecording(newRecording);
+      recordingStartTime.current = Date.now();
       setAppStatus("listening");
-      startMicPulse();
+      startRecordingAnimation();
     } catch (error) {
       console.error("Failed to start recording:", error);
       setAppStatus("idle");
@@ -211,24 +222,22 @@ export default function SessionScreen({ navigation, route }: any) {
     }
   };
 
-  const handlePressOut = async () => {
+  const stopRecording = async () => {
     if (isProcessing) return;
-    setIsProcessing(true);
-
-    const currentRecording = recordingRef.current;
-    if (!currentRecording) {
-      console.warn("No active recording to stop");
+    if (!recordingRef.current) {
       setAppStatus("idle");
-      setIsProcessing(false);
       return;
     }
 
-    stopMicPulse();
+    setIsProcessing(true);
+    stopRecordingAnimation();
     setAppStatus("thinking");
 
     try {
-      await currentRecording.stopAndUnloadAsync();
-      const uri = currentRecording.getURI();
+      const recordingDuration = Date.now() - recordingStartTime.current;
+      
+      await recordingRef.current.stopAndUnloadAsync();
+      const uri = recordingRef.current.getURI();
       recordingRef.current = null;
       setRecording(null);
 
@@ -239,11 +248,34 @@ export default function SessionScreen({ navigation, route }: any) {
 
       if (!uri) {
         setAppStatus("idle");
+        setIsProcessing(false);
+        return;
+      }
+
+      // Check if recording is too short
+      if (recordingDuration < MIN_RECORDING_DURATION) {
+        Alert.alert(
+          "Recording too short",
+          "Please speak for at least 1 second before stopping.",
+          [{ text: "OK", onPress: () => setAppStatus("idle") }]
+        );
+        setIsProcessing(false);
         return;
       }
 
       const userSpeech = await transcribeAudio(uri);
-      const finalText = userSpeech || "I want to talk";
+      
+      if (!userSpeech || userSpeech.trim().length === 0) {
+        Alert.alert(
+          "No speech detected",
+          "We couldn't hear you. Please try speaking louder or check your microphone.",
+          [{ text: "OK", onPress: () => setAppStatus("idle") }]
+        );
+        setIsProcessing(false);
+        return;
+      }
+
+      const finalText = userSpeech.trim();
 
       // Analyze exchange metrics
       const metrics: ExchangeMetrics = analyzeExchange(finalText);
@@ -258,6 +290,7 @@ export default function SessionScreen({ navigation, route }: any) {
         console.error("Character response error:", error);
         Alert.alert("Connection Error", "Failed to get a response. Please try again.");
         setAppStatus("idle");
+        setIsProcessing(false);
         return;
       }
 
@@ -334,18 +367,30 @@ export default function SessionScreen({ navigation, route }: any) {
     }
   };
 
-  const glowOpacity = micGlowAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.5] });
+  const cancelRecording = () => {
+    if (recordingRef.current) {
+      try {
+        recordingRef.current.stopAndUnloadAsync();
+      } catch (_) {}
+      recordingRef.current = null;
+      setRecording(null);
+    }
+    stopRecordingAnimation();
+    setAppStatus("idle");
+  };
+
+  const glowOpacity = micGlowAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.6] });
 
   const getStatusLabel = () => {
     switch (appStatus) {
       case "listening":
-        return "👂 Listening... Release when done";
+        return "🔴 Recording... Tap the mic again to stop";
       case "thinking":
         return `🤔 ${character?.name} is thinking... Please wait!`;
       case "talking":
         return `💬 ${character?.name} is speaking...`;
       default:
-        return "🎙️ Press and hold mic to speak!";
+        return "🎙️ Tap the mic to start speaking!";
     }
   };
 
@@ -372,7 +417,7 @@ export default function SessionScreen({ navigation, route }: any) {
           </View>
           <View style={[styles.statusPill, { backgroundColor: themeColor + "22" }]}>
             <Text style={[styles.statusPillText, { color: themeColor }]}>
-              {appStatus === "idle" ? "Ready" : appStatus === "listening" ? "👂" : appStatus === "thinking" ? "🤔" : "💬"}
+              {appStatus === "idle" ? "Ready" : appStatus === "listening" ? "🔴" : appStatus === "thinking" ? "🤔" : "💬"}
             </Text>
           </View>
         </SafeAreaView>
@@ -387,34 +432,55 @@ export default function SessionScreen({ navigation, route }: any) {
         
         <Text style={styles.statusLabel}>{getStatusLabel()}</Text>
         
+        {/* Larger Mic Area - moved up */}
         <View style={styles.micArea}>
+          {/* Cancel button - only shown when recording */}
+          {appStatus === "listening" && (
+            <TouchableOpacity style={styles.cancelBtn} onPress={cancelRecording} activeOpacity={0.8}>
+              <Ionicons name="close-circle" size={32} color="#FF3B30" />
+              <Text style={styles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+          )}
+          
           <Animated.View style={[styles.micGlowRing, { borderColor: appStatus === "listening" ? "#FF3B30" : themeColor, opacity: glowOpacity, transform: [{ scale: micScale }] }]} />
-          <Animated.View style={[styles.micGlowRingInner, { borderColor: appStatus === "listening" ? "#FF3B30" : themeColor, opacity: Animated.multiply(glowOpacity, new Animated.Value(0.5)), transform: [{ scale: micScale }] }]} />
-          <Animated.View style={{ transform: [{ scale: micScale }], marginTop: 20 }}>
+          <Animated.View style={[styles.micGlowRingInner, { borderColor: appStatus === "listening" ? "#FF3B30" : themeColor, opacity: appStatus === "listening" ? 0.3 : 0, transform: [{ scale: micScale }] }]} />
+          
+          <Animated.View style={{ transform: [{ scale: micScale }] }}>
             <TouchableOpacity
-              onPressIn={handlePressIn}
-              onPressOut={handlePressOut}
+              onPress={appStatus === "listening" ? stopRecording : startRecording}
               disabled={appStatus === "thinking" || appStatus === "talking" || isProcessing}
               activeOpacity={0.85}
-              style={[styles.micBtn, { backgroundColor: appStatus === "listening" ? "#FF3B30" : themeColor, opacity: appStatus === "thinking" || appStatus === "talking" ? 0.45 : 1 }]}
+              style={[
+                styles.micBtn,
+                { backgroundColor: appStatus === "listening" ? "#FF3B30" : themeColor },
+                (appStatus === "thinking" || appStatus === "talking") && styles.micBtnDisabled
+              ]}
             >
-              <Ionicons name={appStatus === "listening" ? "stop" : "mic"} size={44} color="white" />
+              <Ionicons 
+                name={appStatus === "listening" ? "mic" : appStatus === "thinking" ? "hourglass-outline" : appStatus === "talking" ? "volume-high" : "mic"} 
+                size={56} 
+                color="white" 
+              />
             </TouchableOpacity>
           </Animated.View>
+          
+          <Text style={styles.micHint}>
+            {appStatus === "listening" ? "Tap again to stop" : "Tap to start speaking"}
+          </Text>
         </View>
       </LinearGradient>
 
       {/* Chat Modal */}
       <Modal visible={showChatModal} animationType="slide" transparent onRequestClose={() => setShowChatModal(false)}>
-        <View style={{ flex: 1, backgroundColor: 'white', marginTop: 50 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#EEE' }}>
-            <Text style={{ fontSize: 20, fontWeight: 'bold', fontFamily: 'Poppins-Bold' }}>Chat with {character?.name}</Text>
-            <TouchableOpacity onPress={() => setShowChatModal(false)} style={{ padding: 8 }}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Chat with {character?.name}</Text>
+            <TouchableOpacity onPress={() => setShowChatModal(false)} style={styles.modalCloseBtn}>
               <Ionicons name="close" size={28} color="#555" />
             </TouchableOpacity>
           </View>
           
-          <ScrollView style={{ flex: 1, padding: 20 }} showsVerticalScrollIndicator={true}>
+          <ScrollView style={styles.modalChatContent} showsVerticalScrollIndicator={true} ref={scrollRef}>
             {chat.map((msg, index) => (
               <View key={index} style={{ 
                 marginBottom: 16, 
@@ -424,7 +490,7 @@ export default function SessionScreen({ navigation, route }: any) {
                 borderRadius: 20,
                 maxWidth: '85%',
                 borderTopRightRadius: msg.role === 'user' ? 6 : 20,
-                borderTopLeftRadius: msg.role === 'ai' ? 6 : 20,
+                borderTopLeftRadius: msg.role === 'assistant' ? 6 : 20,
               }}>
                 <Text style={{ 
                   color: msg.role === 'user' ? 'white' : '#333', 
@@ -437,9 +503,9 @@ export default function SessionScreen({ navigation, route }: any) {
               </View>
             ))}
             {chat.length === 0 && (
-              <View style={{ alignItems: 'center', marginTop: 50 }}>
-                <Text style={{ fontSize: 56, marginBottom: 10 }}>💬</Text>
-                <Text style={{ color: '#AAA', fontSize: 16, fontFamily: 'Poppins-Medium' }}>No messages yet. Start talking!</Text>
+              <View style={styles.emptyChatContainer}>
+                <Text style={styles.emptyChatEmoji}>💬</Text>
+                <Text style={styles.emptyChatText}>No messages yet. Start talking!</Text>
               </View>
             )}
           </ScrollView>
@@ -451,22 +517,22 @@ export default function SessionScreen({ navigation, route }: any) {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  characterSection: { height: height * 0.6, position: "relative", overflow: "hidden" },
+  characterSection: { height: height * 0.58, position: "relative", overflow: "hidden" },
   characterBottomMask: { position: "absolute", bottom: 0, left: 0, right: 0, height: height * 0.22, zIndex: 10 },
-  topBar: { position: "absolute", top: 0, left: 0, right: 0, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: Platform.OS === "android" ? 36 : 0, zIndex: 20 },
-  backBtn: { width: 48, height: 48, borderRadius: 24, backgroundColor: "rgba(255,255,255,0.85)", alignItems: "center", justifyContent: "center", elevation: 3, shadowOpacity: 0.1, shadowRadius: 6 },
-  starsRow: { flexDirection: "row", gap: 10, alignItems: "center" },
-  star: { fontSize: 26, color: "#CCCCCC" },
+  topBar: { position: "absolute", top: 0, left: 0, right: 0, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: Platform.OS === "android" ? 40 : 12, zIndex: 20 },
+  backBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.9)", alignItems: "center", justifyContent: "center", elevation: 3, shadowOpacity: 0.1, shadowRadius: 6 },
+  starsRow: { flexDirection: "row", gap: 8, alignItems: "center" },
+  star: { fontSize: 24, color: "#CCCCCC" },
   starFilled: { color: "#FFD700" },
-  statusPill: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
-  statusPillText: { fontSize: 13, fontFamily: "Poppins-Bold", letterSpacing: 0.5 },
+  statusPill: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
+  statusPillText: { fontSize: 12, fontFamily: "Poppins-Bold", letterSpacing: 0.5 },
   bottomSection: {
     flex: 1,
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: Platform.OS === "ios" ? 32 : 24,
+    paddingTop: 24,
+    paddingBottom: Platform.OS === "ios" ? 40 : 32,
   },
   seeChatsBtn: {
     flexDirection: "row",
@@ -484,40 +550,100 @@ const styles = StyleSheet.create({
   },
   seeChatsBtnText: { fontSize: 13, fontFamily: "Poppins-SemiBold" },
   statusLabel: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: "Poppins-SemiBold",
     color: "#555555",
     textAlign: "center",
+    marginTop: 16,
   },
   micArea: {
     alignItems: "center",
     justifyContent: "center",
-    width: 88,
-    height: 88,
+    marginTop: 20,
+    marginBottom: 30,
   },
   micGlowRing: {
     position: "absolute",
-    width: 86,
-    height: 86,
-    borderRadius: 43,
-    borderWidth: 3,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 4,
   },
   micGlowRingInner: {
     position: "absolute",
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     borderWidth: 2,
   },
   micBtn: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     alignItems: "center",
     justifyContent: "center",
     elevation: 12,
     shadowColor: "#000",
     shadowOpacity: 0.3,
     shadowRadius: 12,
+  },
+  micBtnDisabled: {
+    opacity: 0.45,
+  },
+  micHint: {
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#AAAAAA",
+    marginTop: 16,
+  },
+  cancelBtn: {
+    position: "absolute",
+    top: -50,
+    alignItems: "center",
+    zIndex: 10,
+  },
+  cancelText: {
+    fontSize: 11,
+    fontFamily: "Poppins-Medium",
+    color: "#FF3B30",
+    marginTop: 4,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'white',
+    marginTop: 50,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEE',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: 'Poppins-Bold',
+    color: '#1A1A2E',
+  },
+  modalCloseBtn: {
+    padding: 8,
+  },
+  modalChatContent: {
+    flex: 1,
+    padding: 20,
+  },
+  emptyChatContainer: {
+    alignItems: 'center',
+    marginTop: 50,
+  },
+  emptyChatEmoji: {
+    fontSize: 56,
+    marginBottom: 10,
+  },
+  emptyChatText: {
+    color: '#AAA',
+    fontSize: 16,
+    fontFamily: 'Poppins-Medium',
   },
 });
