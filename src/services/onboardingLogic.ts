@@ -388,10 +388,12 @@ export const saveChildProfile = async (nickname: string): Promise<void> => {
     await setDoc(userDocRef, docData, { merge: true });
 
     await saveUserSession({
-      nickname: trimmed,
-      onboardingComplete: true,
-      timestamp: getCurrentTimestamp(),
-    });
+  nickname: trimmed,
+  onboardingComplete: true,
+  ageConsent: true,  // ✅ Make sure this is included
+  age: existingData?.age,  // ✅ Preserve age
+  timestamp: getCurrentTimestamp(),
+});
 
     console.log(`Child profile saved: nickname=${trimmed}`);
   } catch (error) {

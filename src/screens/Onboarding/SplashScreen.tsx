@@ -3,6 +3,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { getUserSession, isSessionFullyOnboarded } from '../../services/asyncStorage';
+import { auth } from '../../services/firebase/config';
 
 function ageGroupLabelFromSession(age: number | undefined): string {
   if (age == null) return '10-14';
@@ -15,31 +16,85 @@ function ageGroupLabelFromSession(age: number | undefined): string {
 
 export default function SplashScreen({ navigation }: any) {
   const animation = useRef<LottieView>(null);
-  const [showIntro, setShowIntro] = useState(false);
+  const [redirectTarget, setRedirectTarget] = useState<{
+    route: string;
+    params?: any;
+  } | null>(null);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    
+    const checkSession = async () => {
       try {
+        // Wait for Firebase auth to be ready
+        await auth.authStateReady();
+        
+        // Check local storage for session
         const session = await getUserSession();
+        
         if (cancelled) return;
         
-        // If user already completed onboarding, go straight to character select
-        if (isSessionFullyOnboarded(session)) {
-          navigation.replace('Dashboard');
-          return;
+        const hasCompletedOnboarding = isSessionFullyOnboarded(session);
+        const hasFirebaseUser = auth.currentUser;
+        
+        console.log('Splash check:', { 
+          hasCompletedOnboarding, 
+          hasFirebaseUser: !!hasFirebaseUser,
+          sessionNickname: session?.nickname 
+        });
+        
+        // Determine redirect target
+        if (hasCompletedOnboarding && hasFirebaseUser && session?.nickname) {
+          setRedirectTarget({
+            route: 'Dashboard',
+            params: {}
+          });
+        } else if (session?.nickname && session?.onboardingComplete) {
+          setRedirectTarget({
+            route: 'CharacterSelect',
+            params: {
+              name: session.nickname,
+              ageGroup: ageGroupLabelFromSession(session.age),
+              fromOnboarding: false,
+            }
+          });
+        } else {
+          setRedirectTarget({
+            route: 'AgeInput',
+            params: {}
+          });
         }
-      } catch (e) {
-        console.warn('Splash session check failed', e);
+        
+        // Ready to show animation
+        setIsReady(true);
+        
+      } catch (error) {
+        console.error('Splash screen error:', error);
+        setRedirectTarget({ route: 'AgeInput', params: {} });
+        setIsReady(true);
       }
-      if (!cancelled) setShowIntro(true);
-    })();
+    };
+    
+    checkSession();
+    
     return () => {
       cancelled = true;
     };
-  }, [navigation]);
+  }, []);
 
-  if (!showIntro) {
+  // Handle animation finish
+  const handleAnimationFinish = () => {
+    if (redirectTarget) {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: redirectTarget.route, params: redirectTarget.params }]
+      });
+    }
+  };
+
+  // Show nothing while checking
+  if (!isReady || !redirectTarget) {
     return <View style={styles.container} />;
   }
 
@@ -51,7 +106,7 @@ export default function SplashScreen({ navigation }: any) {
         style={styles.animation}
         autoPlay
         loop={false}
-        onAnimationFinish={() => navigation.replace('AgeInput')}
+        onAnimationFinish={handleAnimationFinish}
         renderMode="SOFTWARE"
       />
     </View>

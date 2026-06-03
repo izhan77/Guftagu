@@ -68,10 +68,9 @@ export const isSessionFullyOnboarded = (
   return (
     session.onboardingComplete === true &&
     session.ageConsent === true &&
-    nick.length > 2
+    nick.length >= 2  // ✅ Changed from > 2 to >= 2
   );
 };
-
 /**
  * Clear user session (sign out)
  */
