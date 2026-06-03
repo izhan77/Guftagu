@@ -75,7 +75,6 @@ function calculateNewStreak(lastSessionDate: any, currentStreak: number): number
 // Main Session Saving Function
 // ============================================================
 // Persists a completed child session and updates score, streak, and character bond progress.
-export async function saveCompleteSession(...)
 export async function saveCompleteSession(sessionData: SessionData): Promise<{
   sessionScore: number;
   newOverallScore: number;
