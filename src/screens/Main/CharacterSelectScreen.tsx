@@ -1,3 +1,4 @@
+// src/screens/Main/CharacterSelectScreen.tsx
 import React, { useState, useRef, useEffect } from "react";
 import {
   View,
@@ -67,6 +68,7 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
       ? CHARACTERS.findIndex((c) => c.id === preselectedCharacterId)
       : 0,
   );
+  const [hasExistingCharacter, setHasExistingCharacter] = useState(false);
 
   useFirestoreSync(navigation);
 
@@ -77,6 +79,7 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
 
   const current = CHARACTERS[index];
 
+  // Continuous Floating Animation
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
@@ -94,6 +97,21 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
         }),
       ]),
     ).start();
+  }, []);
+
+  // Check if user already has a character (for showing Dashboard FAB)
+  useEffect(() => {
+    const checkExistingCharacter = async () => {
+      const user = auth.currentUser;
+      if (user) {
+        const userRef = doc(db, "users", user.uid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists() && userSnap.data()?.chosenCharacter) {
+          setHasExistingCharacter(true);
+        }
+      }
+    };
+    checkExistingCharacter();
   }, []);
 
   const animateSwitch = (newIndex: number, direction: "left" | "right") => {
@@ -134,11 +152,10 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
     outputRange: [0, -15],
   });
 
-  // ─── Handle character selection (bond reset on switch) ───
+  // Handle character selection (bond reset on switch)
   const handlePickCharacter = async () => {
     const user = auth.currentUser;
     if (!user) {
-      // No authenticated user – proceed to session anyway (unlikely)
       navigation.navigate("Session", {
         childName: childName,
         ageGroup: ageGroup,
@@ -152,7 +169,6 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
       const userSnap = await getDoc(userRef);
       const currentCharacter = userSnap.data()?.chosenCharacter;
 
-      // If switching to a different character, reset bond to 10
       if (currentCharacter && currentCharacter !== current.id) {
         await updateDoc(userRef, {
           characterBondLevel: 10,
@@ -160,25 +176,26 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
         });
         console.log(`Switched from ${currentCharacter} to ${current.id} – bond reset to 10`);
       } else if (!currentCharacter) {
-        // First character ever – initialize bond
         await updateDoc(userRef, {
           characterBondLevel: 10,
           characterBondTier: "New",
         });
         console.log("First character selected – bond initialized to 10");
       }
-      // If same character, bond stays as is (no reset)
     } catch (error) {
       console.error("Failed to handle bond on character selection:", error);
-      // Still allow navigation even if bond update fails
     }
 
-    // Navigate to session (character is NOT saved here)
     navigation.navigate("Session", {
       childName: childName,
       ageGroup: ageGroup,
       character: current,
     });
+  };
+
+  // Go directly to Dashboard
+  const goToDashboard = () => {
+    navigation.replace("Dashboard");
   };
 
   return (
@@ -187,6 +204,7 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
       style={styles.container}
     >
       <SafeAreaView style={styles.safe}>
+        {/* Back Button - Only show when coming from onboarding */}
         {fromOnboarding && (
           <TouchableOpacity
             style={styles.backBtnContainer}
@@ -197,11 +215,13 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
           </TouchableOpacity>
         )}
 
+        {/* Header Section */}
         <View style={styles.header}>
           <Text style={styles.greeting}>Hey {childName}! 👋</Text>
           <Text style={styles.title}>Who's your speaking buddy?</Text>
         </View>
 
+        {/* Character Stage */}
         <View style={styles.characterStage}>
           <View style={styles.watermarkWrapper} pointerEvents="none">
             <Animated.Text style={[styles.watermark, { opacity: fadeAnim }]}>
@@ -210,6 +230,7 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
           </View>
 
           <View style={styles.stageContent}>
+            {/* Left Nav */}
             <TouchableOpacity
               onPress={() => index > 0 && animateSwitch(index - 1, "right")}
               style={[styles.navBtn, index === 0 && { opacity: 0 }]}
@@ -249,6 +270,7 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
               />
             </View>
 
+            {/* Right Nav */}
             <TouchableOpacity
               onPress={() =>
                 index < CHARACTERS.length - 1 &&
@@ -264,6 +286,7 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
           </View>
         </View>
 
+        {/* Bottom Floating Island Card */}
         <View style={styles.infoCard}>
           <View
             style={[
@@ -279,6 +302,7 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
           <Text style={styles.charName}>{current.name}</Text>
           <Text style={styles.charTagline}>{current.tagline}</Text>
 
+          {/* Morphing Dots */}
           <View style={styles.dotContainer}>
             {CHARACTERS.map((_, i) => (
               <View
@@ -304,6 +328,16 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
             <Ionicons name="arrow-forward" size={22} color="white" />
           </TouchableOpacity>
         </View>
+
+        {/* FAB Button to Dashboard - Only shows if child has existing character */}
+        {hasExistingCharacter && !fromOnboarding && (
+          <TouchableOpacity style={styles.dashboardFab} onPress={goToDashboard} activeOpacity={0.9}>
+            <LinearGradient colors={["#7C5CBF", "#5A3D9A"]} style={styles.dashboardFabGradient}>
+              <Ionicons name="home-outline" size={22} color="white" />
+              <Text style={styles.dashboardFabText}>Dashboard</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
       </SafeAreaView>
     </LinearGradient>
   );
@@ -311,6 +345,8 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  safe: { flex: 1, paddingHorizontal: 20 },
+  
   backBtnContainer: {
     width: 45,
     height: 45,
@@ -325,7 +361,7 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 5,
   },
-  safe: { flex: 1, paddingHorizontal: 20 },
+  
   header: { alignItems: "center", marginTop: 30, zIndex: 10 },
   greeting: { fontSize: 26, fontFamily: "Poppins-ExtraBold", color: "#000000" },
   title: {
@@ -334,6 +370,7 @@ const styles = StyleSheet.create({
     color: "#2D2D2D",
     textAlign: "center",
   },
+  
   characterStage: {
     flex: 1,
     justifyContent: "center",
@@ -396,6 +433,7 @@ const styles = StyleSheet.create({
     zIndex: 4,
     borderRadius: 60,
   },
+  
   infoCard: {
     backgroundColor: "white",
     borderRadius: 30,
@@ -433,4 +471,30 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   buttonText: { color: "white", fontSize: 18, fontFamily: "Poppins-Bold" },
+  
+  // FAB Button to Dashboard
+  dashboardFab: {
+    position: "absolute",
+    bottom: 20,
+    right: 20,
+    borderRadius: 30,
+    overflow: "hidden",
+    elevation: 8,
+    shadowColor: "#7C5CBF",
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+  },
+  dashboardFabGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 30,
+  },
+  dashboardFabText: {
+    color: "white",
+    fontSize: 14,
+    fontFamily: "Poppins-Bold",
+  },
 });

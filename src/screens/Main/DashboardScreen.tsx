@@ -26,11 +26,12 @@ import {
   orderBy,
   limit,
   getDocs,
-  Timestamp,
 } from "firebase/firestore";
 import { auth, db } from "../../services/firebase/config";
 import { getLevel } from "../../services/scoring";
 import { getUserSession } from "../../services/asyncStorage";
+import { signOut } from "firebase/auth";
+import { clearUserSession } from "../../services/asyncStorage";
 
 const { width, height } = Dimensions.get("window");
 
@@ -94,39 +95,96 @@ const pillStyles = StyleSheet.create({
   text: { fontSize: 12, fontFamily: "Poppins-Bold" },
 });
 
-// ── Shimmer skeleton (unchanged) ──
+// ══════════════════════════════════════════
+// 🦴 SHIMMER SKELETON LOADER
+// ══════════════════════════════════════════
 function useShimmer() {
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(anim, { toValue: 1, duration: 900, useNativeDriver: true }),
-        Animated.timing(anim, { toValue: 0, duration: 900, useNativeDriver: true }),
-      ])
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+        Animated.timing(anim, {
+          toValue: 0,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+      ]),
     ).start();
   }, []);
   return anim;
 }
 
-function Bone({ w, h, radius = 10, style }: { w: number | string; h: number; radius?: number; style?: any }) {
+function Bone({
+  w,
+  h,
+  radius = 10,
+  style,
+}: {
+  w: number | string;
+  h: number;
+  radius?: number;
+  style?: any;
+}) {
   const anim = useShimmer();
-  const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.85] });
-  const translateX = anim.interpolate({ inputRange: [0, 1], outputRange: [-60, 60] });
+  const opacity = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.35, 0.85],
+  });
+  const translateX = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-60, 60],
+  });
   return (
-    <View style={[{ width: w as any, height: h, borderRadius: radius, overflow: "hidden", backgroundColor: "#E8E3F5" }, style]}>
-      <Animated.View style={{ position: "absolute", top: 0, bottom: 0, left: 0, right: 0, opacity, transform: [{ translateX }], backgroundColor: "rgba(255,255,255,0.6)", borderRadius: radius }} />
+    <View
+      style={[
+        {
+          width: w as any,
+          height: h,
+          borderRadius: radius,
+          overflow: "hidden",
+          backgroundColor: "#E8E3F5",
+        },
+        style,
+      ]}
+    >
+      <Animated.View
+        style={{
+          position: "absolute",
+          top: 0,
+          bottom: 0,
+          left: 0,
+          right: 0,
+          opacity,
+          transform: [{ translateX }],
+          backgroundColor: "rgba(255,255,255,0.6)",
+          borderRadius: radius,
+        }}
+      />
     </View>
   );
 }
 
 function DashboardSkeleton() {
   const shimmer = useShimmer();
-  const headerOpacity = shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] });
+  const headerOpacity = shimmer.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.7, 1],
+  });
+
   return (
     <View style={{ flex: 1, backgroundColor: "#F3E8FF" }}>
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* ── Hero skeleton ── */}
         <Animated.View style={{ opacity: headerOpacity }}>
-          <LinearGradient colors={["#C4B0E8", "#D4C4F0"]} style={skeletonStyles.heroSkel}>
+          <LinearGradient
+            colors={["#C4B0E8", "#D4C4F0"]}
+            style={skeletonStyles.heroSkel}
+          >
             <SafeAreaView>
               <View style={skeletonStyles.heroRow}>
                 <View style={{ flex: 1, gap: 8 }}>
@@ -134,8 +192,10 @@ function DashboardSkeleton() {
                   <Bone w={160} h={32} radius={10} style={{ marginTop: 4 }} />
                   <Bone w={110} h={26} radius={13} style={{ marginTop: 6 }} />
                 </View>
+                {/* Avatar */}
                 <View style={skeletonStyles.avatarSkel} />
               </View>
+              {/* Streak bar */}
               <View style={skeletonStyles.streakSkel}>
                 <Bone w={24} h={24} radius={12} />
                 <Bone w="60%" h={14} radius={7} />
@@ -148,6 +208,8 @@ function DashboardSkeleton() {
             </SafeAreaView>
           </LinearGradient>
         </Animated.View>
+
+        {/* ── Stats row skeleton ── */}
         <View style={skeletonStyles.statsRow}>
           {[0, 1, 2].map((i) => (
             <View key={i} style={skeletonStyles.statCardSkel}>
@@ -157,13 +219,21 @@ function DashboardSkeleton() {
             </View>
           ))}
         </View>
+
+        {/* ── Confidence card skeleton ── */}
         <View style={skeletonStyles.card}>
           <View style={skeletonStyles.cardHeader}>
             <Bone w={170} h={18} radius={9} />
             <Bone w={60} h={28} radius={14} />
           </View>
           <Bone w="100%" h={32} radius={16} style={{ marginBottom: 10 }} />
-          <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              marginTop: 4,
+            }}
+          >
             <Bone w={110} h={12} radius={6} />
             <Bone w={110} h={12} radius={6} />
           </View>
@@ -173,6 +243,8 @@ function DashboardSkeleton() {
             ))}
           </View>
         </View>
+
+        {/* ── Challenge card skeleton ── */}
         <View style={skeletonStyles.challengeSkel}>
           <View style={{ flex: 1, gap: 10 }}>
             <Bone w={120} h={26} radius={13} />
@@ -182,6 +254,8 @@ function DashboardSkeleton() {
           </View>
           <Bone w={56} h={56} radius={28} style={{ marginLeft: 12 }} />
         </View>
+
+        {/* ── Learning progress skeleton ── */}
         <View style={skeletonStyles.card}>
           <View style={skeletonStyles.cardHeader}>
             <Bone w={190} h={18} radius={9} />
@@ -202,6 +276,8 @@ function DashboardSkeleton() {
           ))}
           <Bone w="100%" h={44} radius={14} style={{ marginTop: 8 }} />
         </View>
+
+        {/* ── Buddies skeleton ── */}
         <View style={skeletonStyles.card}>
           <Bone w={210} h={18} radius={9} style={{ marginBottom: 16 }} />
           <View style={skeletonStyles.buddiesRow}>
@@ -214,10 +290,13 @@ function DashboardSkeleton() {
             ))}
           </View>
         </View>
+
+        {/* Parent portal */}
         <View style={skeletonStyles.parentRow}>
           <Bone w={18} h={18} radius={9} />
           <Bone w={100} h={14} radius={7} />
         </View>
+
         <View style={{ height: 100 }} />
       </ScrollView>
     </View>
@@ -225,32 +304,122 @@ function DashboardSkeleton() {
 }
 
 const skeletonStyles = StyleSheet.create({
-  heroSkel: { paddingHorizontal: 22, paddingBottom: 28, borderBottomLeftRadius: 36, borderBottomRightRadius: 36 },
-  heroRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 10 },
-  avatarSkel: { width: 96, height: 96, borderRadius: 48, backgroundColor: "rgba(255,255,255,0.3)" },
-  streakSkel: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "rgba(255,255,255,0.18)", borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, marginTop: 14 },
-  statsRow: { flexDirection: "row", marginHorizontal: 16, marginTop: 16, gap: 10 },
-  statCardSkel: { flex: 1, borderRadius: 22, paddingVertical: 16, alignItems: "center", backgroundColor: "#D8CDEE", elevation: 4, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 8 },
-  card: { backgroundColor: "white", borderRadius: 26, padding: 20, marginHorizontal: 16, marginTop: 14, elevation: 4, shadowColor: "#000", shadowOpacity: 0.07, shadowRadius: 12 },
-  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
-  milestonesRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 14 },
-  challengeSkel: { backgroundColor: "#E0D0F5", borderRadius: 26, padding: 22, flexDirection: "row", alignItems: "center", marginHorizontal: 16, marginTop: 14, elevation: 4, shadowColor: "#000", shadowOpacity: 0.07, shadowRadius: 10 },
-  topicRowSkel: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 18 },
+  heroSkel: {
+    paddingHorizontal: 22,
+    paddingBottom: 28,
+    borderBottomLeftRadius: 36,
+    borderBottomRightRadius: 36,
+  },
+  heroRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: 10,
+  },
+  avatarSkel: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: "rgba(255,255,255,0.3)",
+  },
+  streakSkel: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginTop: 14,
+  },
+  statsRow: {
+    flexDirection: "row",
+    marginHorizontal: 16,
+    marginTop: 16,
+    gap: 10,
+  },
+  statCardSkel: {
+    flex: 1,
+    borderRadius: 22,
+    paddingVertical: 16,
+    alignItems: "center",
+    backgroundColor: "#D8CDEE",
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+  },
+  card: {
+    backgroundColor: "white",
+    borderRadius: 26,
+    padding: 20,
+    marginHorizontal: 16,
+    marginTop: 14,
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  milestonesRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 14,
+  },
+  challengeSkel: {
+    backgroundColor: "#E0D0F5",
+    borderRadius: 26,
+    padding: 22,
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 16,
+    marginTop: 14,
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+  },
+  topicRowSkel: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 18,
+  },
   buddiesRow: { flexDirection: "row", gap: 10 },
-  buddyCardSkel: { flex: 1, alignItems: "center", borderRadius: 22, padding: 14, borderWidth: 2, borderColor: "#EEEEEE", backgroundColor: "#FAFAFA" },
-  parentRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 16, marginTop: 6 },
+  buddyCardSkel: {
+    flex: 1,
+    alignItems: "center",
+    borderRadius: 22,
+    padding: 14,
+    borderWidth: 2,
+    borderColor: "#EEEEEE",
+    backgroundColor: "#FAFAFA",
+  },
+  parentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 16,
+    marginTop: 6,
+  },
 });
 
-// ─── Main Dashboard Component ───
 export default function DashboardScreen({ navigation }: any) {
   const [userData, setUserData] = useState<any>(null);
   const [recentSessions, setRecentSessions] = useState<any[]>([]);
-  const [allSessions, setAllSessions] = useState<any[]>([]); // for modal
-  const [weeklyScores, setWeeklyScores] = useState<number[]>([]);
+  const [allSessions, setAllSessions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showChatsModal, setShowChatsModal] = useState(false);
-  const [todayPrompt] = useState(DAILY_PROMPTS[new Date().getDay() % DAILY_PROMPTS.length]);
+  const [todayPrompt] = useState(
+    DAILY_PROMPTS[new Date().getDay() % DAILY_PROMPTS.length],
+  );
 
   // Animations
   const headerAnim = useRef(new Animated.Value(0)).current;
@@ -260,30 +429,89 @@ export default function DashboardScreen({ navigation }: any) {
 
   useEffect(() => {
     Animated.stagger(120, [
-      Animated.spring(headerAnim, { toValue: 1, useNativeDriver: true, tension: 60, friction: 8 }),
-      Animated.spring(statsAnim, { toValue: 1, useNativeDriver: true, tension: 60, friction: 8 }),
-      Animated.spring(cardAnim, { toValue: 1, useNativeDriver: true, tension: 60, friction: 8 }),
+      Animated.spring(headerAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 60,
+        friction: 8,
+      }),
+      Animated.spring(statsAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 60,
+        friction: 8,
+      }),
+      Animated.spring(cardAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 60,
+        friction: 8,
+      }),
     ]).start();
+
+    // FAB heartbeat
     Animated.loop(
       Animated.sequence([
-        Animated.timing(fabPulse, { toValue: 1.12, duration: 700, useNativeDriver: true }),
-        Animated.timing(fabPulse, { toValue: 1, duration: 700, useNativeDriver: true }),
-      ])
+        Animated.timing(fabPulse, {
+          toValue: 1.12,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fabPulse, {
+          toValue: 1,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+      ]),
     ).start();
   }, []);
 
-// ... (all imports and code above unchanged until loadData) ...
-
-const loadData = async () => {
-  try {
-    const user = auth.currentUser;
-    const localSession = await getUserSession();
-    if (user) {
-      // Fetch user document
-      const userSnap = await getDoc(doc(db, "users", user.uid));
-      if (userSnap.exists()) {
+  const loadData = async () => {
+    try {
+      const user = auth.currentUser;
+      const localSession = await getUserSession();
+      
+      if (user) {
+        // Fetch user document
+        const userSnap = await getDoc(doc(db, "users", user.uid));
+        
+        // If user document doesn't exist, sign out and restart
+        if (!userSnap.exists()) {
+          console.log("User document not found - signing out");
+          await signOut(auth);
+          await clearUserSession();
+          navigation.reset({
+            index: 0,
+            routes: [{ name: "Splash" }],
+          });
+          return;
+        }
+        
         const data = userSnap.data();
         setUserData(data);
+        
+        // Fetch recent sessions (last 5 for learning progress)
+        const sessionsQ = query(
+          collection(db, "sessions"),
+          where("childUid", "==", user.uid),
+          orderBy("sessionDate", "desc"),
+          limit(5)
+        );
+        const sessionsSnap = await getDocs(sessionsQ);
+        const recent = sessionsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setRecentSessions(recent);
+        
+        // Fetch all sessions for modal (limit to 20)
+        const allSessionsQ = query(
+          collection(db, "sessions"),
+          where("childUid", "==", user.uid),
+          orderBy("sessionDate", "desc"),
+          limit(20)
+        );
+        const allSnap = await getDocs(allSessionsQ);
+        const all = allSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setAllSessions(all);
+        
       } else if (localSession) {
         setUserData({
           nickname: localSession.nickname,
@@ -292,71 +520,24 @@ const loadData = async () => {
           totalSessions: 0,
           chosenCharacter: "zara",
         });
+      } else {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: "Splash" }],
+        });
       }
-
-      // Fetch recent sessions (last 5)
-      const sessionsQuery = query(
-        collection(db, "sessions"),
-        where("childUid", "==", user.uid),
-        orderBy("sessionDate", "desc"),
-        limit(5)
-      );
-      const sessionsSnap = await getDocs(sessionsQuery);
-      const recent = sessionsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setRecentSessions(recent);
-
-      // Fetch all sessions for modal (limit to 20 for performance)
-      const allSessionsQuery = query(
-        collection(db, "sessions"),
-        where("childUid", "==", user.uid),
-        orderBy("sessionDate", "desc"),
-        limit(20)
-      );
-      const allSnap = await getDocs(allSessionsQuery);
-      const all = allSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setAllSessions(all);
-
-      // ✅ CORRECTED BLOCK – Fetch weekly sessions for chart
-      const weeklyQuery = query(
-        collection(db, "sessions"),
-        where("childUid", "==", user.uid),
-        orderBy("sessionDate", "desc"),
-        limit(20)
-      );
-      const weeklySnap = await getDocs(weeklyQuery);
-
-      const now = new Date();
-      const weekAgo = new Date(now.setDate(now.getDate() - 7));
-      const recentFilteredSessions = weeklySnap.docs
-        .map(doc => doc.data())
-        .filter(s => s.sessionDate.toDate() >= weekAgo)
-        .sort((a, b) => a.sessionDate.toDate() - b.sessionDate.toDate());
-
-      const weeklyScores = recentFilteredSessions.map(s => s.sessionScore);
-      setWeeklyScores(weeklyScores);
-    } else if (localSession) {
-      // Fallback to local only if no user (should not happen normally)
-      setUserData({
-        nickname: localSession.nickname,
-        confidenceScore: 50,
-        sessionStreak: 0,
-        totalSessions: 0,
-        chosenCharacter: "zara",
-      });
+    } catch (e) {
+      console.log("Dashboard load error:", e);
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
     }
-  } catch (e) {
-    console.log("Dashboard load error:", e);
-  } finally {
-    setIsLoading(false);
-    setRefreshing(false);
-  }
-};
+  };
 
-// ... rest of the file unchanged ...
   useEffect(() => {
     loadData();
   }, []);
-
+  
   const onRefresh = () => {
     setRefreshing(true);
     loadData();
@@ -379,30 +560,69 @@ const loadData = async () => {
     hour < 12
       ? "Good Morning ☀️"
       : hour < 17
-      ? "Good Afternoon 🌤️"
-      : "Good Evening 🌙";
+        ? "Good Afternoon 🌤️"
+        : "Good Evening 🌙";
 
-  // Build topics from recent sessions (real data)
-  const topics = recentSessions.map((s, i) => ({
+  // Build topics from real sessions (no mock data)
+  const topics = recentSessions.length > 0
+    ? recentSessions.map((s, i) => ({
+        id: s.id,
+        topic: s.topics?.[0] || DAILY_PROMPTS[i % DAILY_PROMPTS.length],
+        confidence: s.sessionScore ?? 50,
+        date: s.sessionDate?.toDate?.()?.toLocaleDateString("en-PK", { month: "short", day: "numeric" }) || "Recent",
+        charId: s.characterId || charId,
+      }))
+    : [];
+
+  // Build all chats for modal from real sessions
+  const allChats = allSessions.map((s) => ({
     id: s.id,
-    topic: s.topics?.[0] || DAILY_PROMPTS[i % DAILY_PROMPTS.length],
-    confidence: s.sessionScore ?? Math.floor(Math.random() * 30 + 65),
-    date: s.sessionDate?.toDate?.()?.toLocaleDateString("en-PK", { month: "short", day: "numeric" }) || "Recent",
+    topic: s.topics?.[0] || "General Conversation",
+    confidence: s.sessionScore ?? 50,
+    date: s.sessionDate?.toDate?.()?.toLocaleDateString("en-PK", { month: "short", day: "numeric" }) || "Unknown",
     charId: s.characterId || charId,
+    duration: s.sessionDuration ? `${Math.floor(s.sessionDuration / 60)} min` : "? min",
   }));
 
   return (
     <View style={[styles.root, { backgroundColor: bgColor }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colorA} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colorA}
+          />
+        }
       >
-        {/* Hero Header (unchanged) */}
-        <Animated.View style={{ opacity: headerAnim, transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [-30, 0] }) }] }}>
-          <LinearGradient colors={[colorA, colorB]} style={styles.hero} start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}>
-            <View style={styles.blobTR} /><View style={styles.blobBL} />
+        {/* ══════════ HERO HEADER ══════════ */}
+        <Animated.View
+          style={{
+            opacity: headerAnim,
+            transform: [
+              {
+                translateY: headerAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-30, 0],
+                }),
+              },
+            ],
+          }}
+        >
+          <LinearGradient
+            colors={[colorA, colorB]}
+            style={styles.hero}
+            start={{ x: 0.1, y: 0 }}
+            end={{ x: 0.9, y: 1 }}
+          >
+            {/* Decorative blobs */}
+            <View style={styles.blobTR} />
+            <View style={styles.blobBL} />
+
             <SafeAreaView>
               <View style={styles.heroContent}>
+                {/* Left: greeting + name */}
                 <View style={styles.heroLeft}>
                   <Text style={styles.greetingSmall}>{greeting}</Text>
                   <Text style={styles.heroName}>{nickname}!</Text>
@@ -411,9 +631,21 @@ const loadData = async () => {
                     <Text style={styles.levelBadgeText}>{level.level}</Text>
                   </View>
                 </View>
+
+                {/* Right: Avatar circle */}
                 <View style={styles.avatarWrap}>
-                  <LinearGradient colors={["rgba(255,255,255,0.45)", "rgba(255,255,255,0.15)"]} style={styles.avatarGlowRing}>
-                    <Image source={require("../../../assets/avatar.png")} style={styles.avatarImg} resizeMode="cover" />
+                  <LinearGradient
+                    colors={[
+                      "rgba(255,255,255,0.45)",
+                      "rgba(255,255,255,0.15)",
+                    ]}
+                    style={styles.avatarGlowRing}
+                  >
+                    <Image
+                      source={require("../../../assets/avatar.png")}
+                      style={styles.avatarImg}
+                      resizeMode="cover"
+                    />
                   </LinearGradient>
                 </View>
               </View>
@@ -421,14 +653,50 @@ const loadData = async () => {
           </LinearGradient>
         </Animated.View>
 
-        {/* Stats Cards */}
-        <Animated.View style={[styles.statsRow, { opacity: statsAnim, transform: [{ scale: statsAnim.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }] }]}>
+        {/* ══════════ STAT CARDS ══════════ */}
+        <Animated.View
+          style={[
+            styles.statsRow,
+            {
+              opacity: statsAnim,
+              transform: [
+                {
+                  scale: statsAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.9, 1],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
           {[
-            { emoji: "🎯", value: score, label: "My Score", grad: [colorA, colorB] as [string, string] },
-            { emoji: "🔥", value: streak, label: "Day Streak", grad: ["#FF6B6B", "#EE4444"] as [string, string] },
-            { emoji: "🎙️", value: totalSessions, label: "Sessions", grad: ["#00C9B8", "#00A3A3"] as [string, string] },
+            {
+              emoji: "🎯",
+              value: score,
+              label: "My Score",
+              grad: [colorA, colorB] as [string, string],
+            },
+            {
+              emoji: "🔥",
+              value: streak,
+              label: "Day Streak",
+              grad: ["#FF6B6B", "#EE4444"] as [string, string],
+            },
+            {
+              emoji: "🎙️",
+              value: totalSessions,
+              label: "Sessions",
+              grad: ["#00C9B8", "#00A3A3"] as [string, string],
+            },
           ].map((s, i) => (
-            <LinearGradient key={i} colors={s.grad} style={styles.statCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+            <LinearGradient
+              key={i}
+              colors={s.grad}
+              style={styles.statCard}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
               <Text style={styles.statEmoji}>{s.emoji}</Text>
               <Text style={styles.statValue}>{s.value}</Text>
               <Text style={styles.statLabel}>{s.label}</Text>
@@ -436,7 +704,7 @@ const loadData = async () => {
           ))}
         </Animated.View>
 
-        {/* Confidence Meter */}
+        {/* ══════════ CONFIDENCE METER ══════════ */}
         <Animated.View style={[styles.card, { opacity: cardAnim }]}>
           <View style={styles.cardHeaderRow}>
             <Text style={styles.cardTitle}>My Confidence 📈</Text>
@@ -444,8 +712,15 @@ const loadData = async () => {
               <Text style={styles.scorePillText}>{score} / 100</Text>
             </View>
           </View>
+
+          {/* Big chunky progress bar */}
           <View style={styles.progressTrack}>
-            <LinearGradient colors={[colorA, colorB]} style={[styles.progressFill, { width: `${score}%` }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+            <LinearGradient
+              colors={[colorA, colorB]}
+              style={[styles.progressFill, { width: `${score}%` }]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
               <Text style={styles.progressEmoji}>{level.emoji}</Text>
             </LinearGradient>
           </View>
@@ -453,24 +728,58 @@ const loadData = async () => {
             <Text style={styles.progressLabelText}>Shy Seedling</Text>
             <Text style={styles.progressLabelText}>Voice Champion</Text>
           </View>
+
+          {/* Milestone dots */}
           <View style={styles.milestones}>
             {[25, 50, 75, 100].map((m) => (
-              <View key={m} style={[styles.milestone, score >= m && { backgroundColor: colorA }]}>
-                <Text style={[styles.milestoneText, score >= m && { color: "white" }]}>{m}</Text>
+              <View
+                key={m}
+                style={[
+                  styles.milestone,
+                  score >= m && { backgroundColor: colorA },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.milestoneText,
+                    score >= m && { color: "white" },
+                  ]}
+                >
+                  {m}
+                </Text>
               </View>
             ))}
           </View>
         </Animated.View>
 
-        {/* Daily Challenge */}
-        <Animated.View style={{ opacity: cardAnim, marginHorizontal: 16, marginTop: 14 }}>
-          <LinearGradient colors={["#FF9500", "#FF6B00"]} style={styles.challengeCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+        {/* ══════════ DAILY CHALLENGE ══════════ */}
+        <Animated.View
+          style={{ opacity: cardAnim, marginHorizontal: 16, marginTop: 14 }}
+        >
+          <LinearGradient
+            colors={["#FF9500", "#FF6B00"]}
+            style={styles.challengeCard}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
             <View style={styles.challengeLeft}>
               <View style={styles.challengeBadgePill}>
-                <Text style={styles.challengeBadgeLabel}>Today's Challenge</Text>
+                <Text style={styles.challengeBadgeLabel}>
+                  Today's Challenge
+                </Text>
               </View>
               <Text style={styles.challengeQuestion}>{todayPrompt}</Text>
-              <TouchableOpacity style={styles.challengeBtn} onPress={() => navigation.navigate("CharacterSelect", { name: nickname, ageGroup: "10-14", fromOnboarding: false })} activeOpacity={0.85}>
+              <TouchableOpacity
+                style={styles.challengeBtn}
+                onPress={() =>
+                  navigation.navigate("CharacterSelect", {
+                    name: nickname,
+                    ageGroup: "10-14",
+                    fromOnboarding: false,
+                  })
+                }
+                activeOpacity={0.85}
+              >
                 <Text style={styles.challengeBtnText}>Start Talking!</Text>
               </TouchableOpacity>
             </View>
@@ -478,11 +787,12 @@ const loadData = async () => {
           </LinearGradient>
         </Animated.View>
 
-        {/* Learning Progress (Recent Topics) */}
+        {/* ══════════ LEARNING PROGRESS (Recent Topics) ══════════ */}
         <Animated.View style={[styles.card, { opacity: cardAnim }]}>
           <View style={styles.cardHeaderRow}>
             <Text style={styles.cardTitle}>Learning Progress 🚀</Text>
           </View>
+
           {topics.length === 0 ? (
             <Text style={{ textAlign: "center", marginVertical: 20, color: "#AAA" }}>No sessions yet. Start talking!</Text>
           ) : (
@@ -490,31 +800,56 @@ const loadData = async () => {
               const [tc1, tc2] = CHAR_COLORS[t.charId] || CHAR_COLORS.zara;
               return (
                 <View key={t.id} style={styles.topicRow}>
+                  {/* Character mini avatar */}
                   <LinearGradient colors={[tc1, tc2]} style={styles.topicCharDot}>
-                    <Image source={CHAR_IMAGES[t.charId]} style={styles.topicCharImg} resizeMode="contain" />
+                    <Image
+                      source={CHAR_IMAGES[t.charId]}
+                      style={styles.topicCharImg}
+                      resizeMode="contain"
+                    />
                   </LinearGradient>
+
                   <View style={styles.topicInfo}>
                     <Text style={styles.topicName}>{t.topic}</Text>
                     <View style={styles.topicBarTrack}>
-                      <LinearGradient colors={[tc1, tc2]} style={[styles.topicBarFill, { width: `${t.confidence}%` }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} />
+                      <LinearGradient
+                        colors={[tc1, tc2]}
+                        style={[
+                          styles.topicBarFill,
+                          { width: `${t.confidence}%` },
+                        ]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                      />
                     </View>
                     <Text style={styles.topicDate}>{t.date}</Text>
                   </View>
+
                   <View style={styles.topicRight}>
-                    <Text style={[styles.topicScore, { color: tc1 }]}>{t.confidence}%</Text>
+                    <Text style={[styles.topicScore, { color: tc1 }]}>
+                      {t.confidence}%
+                    </Text>
                     <ConfidencePill value={t.confidence} color={tc1} />
                   </View>
                 </View>
               );
             })
           )}
-          <TouchableOpacity style={[styles.showMoreBtn, { borderColor: colorA }]} onPress={() => setShowChatsModal(true)} activeOpacity={0.8}>
-            <Text style={[styles.showMoreText, { color: colorA }]}>+ Show More Chats</Text>
+
+          {/* Show More button */}
+          <TouchableOpacity
+            style={[styles.showMoreBtn, { borderColor: colorA }]}
+            onPress={() => setShowChatsModal(true)}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.showMoreText, { color: colorA }]}>
+              + Show More Chats
+            </Text>
             <Ionicons name="chevron-down" size={16} color={colorA} />
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Speaking Buddies (unchanged) */}
+        {/* ══════════ SPEAKING BUDDIES ══════════ */}
         <Animated.View style={[styles.card, { opacity: cardAnim }]}>
           <Text style={styles.cardTitle}>My Speaking Buddies</Text>
           <View style={styles.buddiesRow}>
@@ -524,39 +859,96 @@ const loadData = async () => {
               return (
                 <TouchableOpacity
                   key={id}
-                  style={[styles.buddyCard, isActive && { borderColor: bc1, borderWidth: 3 }]}
-                  onPress={() => navigation.navigate("CharacterSelect", { name: nickname, ageGroup: "10-14", fromOnboarding: false, preselectedCharacterId: id })}
+                  style={[
+                    styles.buddyCard,
+                    isActive && { borderColor: bc1, borderWidth: 3 },
+                  ]}
+                  onPress={() =>
+                    navigation.navigate("CharacterSelect", {
+                      name: nickname,
+                      ageGroup: "10-14",
+                      fromOnboarding: false,
+                      preselectedCharacterId: id,
+                    })
+                  }
                   activeOpacity={0.85}
                 >
-                  {isActive && <LinearGradient colors={[bc1 + "22", bc2 + "22"]} style={StyleSheet.absoluteFill} />}
+                  {isActive && (
+                    <LinearGradient
+                      colors={[bc1 + "22", bc2 + "22"]}
+                      style={StyleSheet.absoluteFill}
+                    />
+                  )}
                   <View style={styles.buddyImgWrap}>
-                    <Image source={CHAR_IMAGES[id]} style={styles.buddyImg} resizeMode="contain" />
-                    {isActive && <View style={[styles.buddyActiveBadge, { backgroundColor: bc1 }]}><Text style={{ fontSize: 8 }}>✓</Text></View>}
+                    <Image
+                      source={CHAR_IMAGES[id]}
+                      style={styles.buddyImg}
+                      resizeMode="contain"
+                    />
+                    {isActive && (
+                      <View
+                        style={[
+                          styles.buddyActiveBadge,
+                          { backgroundColor: bc1 },
+                        ]}
+                      >
+                        <Text style={{ fontSize: 8 }}>✓</Text>
+                      </View>
+                    )}
                   </View>
-                  <Text style={[styles.buddyName, isActive && { color: bc1 }]}>{CHAR_LABELS[id]}</Text>
+                  <Text style={[styles.buddyName, isActive && { color: bc1 }]}>
+                    {CHAR_LABELS[id]}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
           </View>
         </Animated.View>
 
-        {/* Parent Portal (unchanged) */}
-        <TouchableOpacity style={styles.parentPortalCard} onPress={() => navigation.navigate("ParentPortal")} activeOpacity={0.88}>
-          <LinearGradient colors={["#F8F5FF", "#EDE8FF"]} style={styles.parentPortalInner} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-            <View style={styles.parentPortalIconWrap}><Ionicons name="shield-checkmark" size={28} color="#7C5CBF" /></View>
-            <View style={styles.parentPortalText}>
-              <Text style={styles.parentPortalTitle}>Parent Portal</Text>
-              <Text style={styles.parentPortalSub}>View your child's full progress & reports</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={22} color="#7C5CBF" />
-          </LinearGradient>
-        </TouchableOpacity>
+        {/* Parent Portal - Only show for users UNDER 14 */}
+        {userData?.age && userData.age < 14 && (
+          <TouchableOpacity
+            style={styles.parentPortalCard}
+            onPress={() => navigation.navigate("ParentPortal")}
+            activeOpacity={0.88}
+          >
+            <LinearGradient
+              colors={["#F8F5FF", "#EDE8FF"]}
+              style={styles.parentPortalInner}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <View style={styles.parentPortalIconWrap}>
+                <Ionicons name="shield-checkmark" size={28} color="#7C5CBF" />
+              </View>
+              <View style={styles.parentPortalText}>
+                <Text style={styles.parentPortalTitle}>Parent Portal</Text>
+                <Text style={styles.parentPortalSub}>
+                  View your child's full progress & reports
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={22} color="#7C5CBF" />
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* FAB (unchanged) */}
-      <Animated.View style={[styles.fabWrap, { transform: [{ scale: fabPulse }] }]}>
-        <TouchableOpacity onPress={() => navigation.navigate("CharacterSelect", { name: nickname, ageGroup: "10-14", fromOnboarding: false })} activeOpacity={0.9}>
+      {/* ══════════ FAB ══════════ */}
+      <Animated.View
+        style={[styles.fabWrap, { transform: [{ scale: fabPulse }] }]}
+      >
+        <TouchableOpacity
+          onPress={() =>
+            navigation.navigate("CharacterSelect", {
+              name: nickname,
+              ageGroup: "10-14",
+              fromOnboarding: false,
+            })
+          }
+          activeOpacity={0.9}
+        >
           <LinearGradient colors={[colorA, colorB]} style={styles.fab}>
             <Ionicons name="mic" size={30} color="white" />
             <Text style={styles.fabLabel}>Talk!</Text>
@@ -564,40 +956,72 @@ const loadData = async () => {
         </TouchableOpacity>
       </Animated.View>
 
-      {/* All Chats Modal (using real allSessions) */}
-      <Modal visible={showChatsModal} animationType="slide" transparent onRequestClose={() => setShowChatsModal(false)}>
+      {/* ══════════ ALL CHATS MODAL ══════════ */}
+      <Modal
+        visible={showChatsModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowChatsModal(false)}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
+            {/* Handle */}
             <View style={styles.modalHandle} />
+
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>All My Chats</Text>
-              <TouchableOpacity onPress={() => setShowChatsModal(false)} style={styles.modalClose}><Ionicons name="close-circle" size={28} color="#CCCCCC" /></TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setShowChatsModal(false)}
+                style={styles.modalClose}
+              >
+                <Ionicons name="close-circle" size={28} color="#CCCCCC" />
+              </TouchableOpacity>
             </View>
-            <Text style={styles.modalSubtitle}>Every time you practiced speaking with Guftagu!</Text>
+            <Text style={styles.modalSubtitle}>
+              Every time you practiced speaking with Guftagu!
+            </Text>
+
             <FlatList
-              data={allSessions}
-              keyExtractor={(item) => item.id}
+              data={allChats}
+              keyExtractor={(i) => i.id}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingBottom: 20 }}
               ListEmptyComponent={<Text style={{ textAlign: "center", marginTop: 40, color: "#AAA" }}>No sessions yet. Start talking!</Text>}
               renderItem={({ item }) => {
-                const [mc1, mc2] = CHAR_COLORS[item.characterId] || CHAR_COLORS.zara;
-                const sessionDate = item.sessionDate?.toDate?.() || new Date();
-                const formattedDate = sessionDate.toLocaleDateString("en-PK", { month: "short", day: "numeric" });
-                const duration = item.sessionDuration ? `${Math.floor(item.sessionDuration / 60)} min` : "? min";
+                const [mc1, mc2] = CHAR_COLORS[item.charId] || CHAR_COLORS.zara;
                 return (
                   <View style={styles.modalChatRow}>
-                    <LinearGradient colors={[mc1, mc2]} style={styles.modalChatIcon}>
-                      <Image source={CHAR_IMAGES[item.characterId]} style={{ width: 32, height: 32 }} resizeMode="contain" />
+                    <LinearGradient
+                      colors={[mc1, mc2]}
+                      style={styles.modalChatIcon}
+                    >
+                      <Image
+                        source={CHAR_IMAGES[item.charId]}
+                        style={{ width: 32, height: 32 }}
+                        resizeMode="contain"
+                      />
                     </LinearGradient>
                     <View style={styles.modalChatInfo}>
-                      <Text style={styles.modalChatTopic}>{item.topics?.[0] || "General Conversation"}</Text>
-                      <Text style={styles.modalChatMeta}>with {CHAR_LABELS[item.characterId]} · {formattedDate} · {duration}</Text>
+                      <Text style={styles.modalChatTopic}>{item.topic}</Text>
+                      <Text style={styles.modalChatMeta}>
+                        with {CHAR_LABELS[item.charId]} · {item.date} ·{" "}
+                        {item.duration}
+                      </Text>
                       <View style={styles.modalMiniBar}>
-                        <LinearGradient colors={[mc1, mc2]} style={[styles.modalMiniBarFill, { width: `${item.sessionScore}%` }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} />
+                        <LinearGradient
+                          colors={[mc1, mc2]}
+                          style={[
+                            styles.modalMiniBarFill,
+                            { width: `${item.confidence}%` },
+                          ]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                        />
                       </View>
                     </View>
-                    <Text style={[styles.modalChatScore, { color: mc1 }]}>{item.sessionScore}%</Text>
+                    <Text style={[styles.modalChatScore, { color: mc1 }]}>
+                      {item.confidence}%
+                    </Text>
                   </View>
                 );
               }}

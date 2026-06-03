@@ -328,14 +328,14 @@ export const verifyParentAnswer = async (consentId: string, answer: string): Pro
   
   // Link child to parent (if email exists)
   if (parentEmail) {
-    try {
-      await linkChildToParent(parentEmail, user.uid);
-      console.log(`Child ${user.uid} linked to parent email ${parentEmail}`);
-    } catch (error) {
-      console.error('Failed to link child to parent:', error);
-      // Continue – child can still use app, but parent portal may not work
-    }
+  try {
+    const cleanEmail = parentEmail.toLowerCase().trim();
+    await linkChildToParent(cleanEmail, user.uid);
+    console.log(`Child ${user.uid} linked to parent email ${cleanEmail}`);
+  } catch (error) {
+    console.error('Failed to link child to parent:', error);
   }
+}
   
   // Delete sensitive data from child's document (COPPA)
   await updateDoc(userRef, {
@@ -463,43 +463,61 @@ export const saveSessionInteraction = async (
   }
 };
 
+// src/services/onboardingLogic.ts
+// REPLACE the entire linkChildToParent function
+
 export const linkChildToParent = async (parentEmail: string, childUid: string): Promise<string> => {
   try {
-    // IMPORTANT: The parent needs their OWN anonymous sign-in
-    // But since we're already authenticated as the child, we need to
-    // create a SEPARATE parent document with the child's UID as reference
+    const trimmedEmail = parentEmail.toLowerCase().trim();
+    const trimmedChildUid = childUid.trim();
     
-    // For now, use the child's UID as a reference, but store it properly
-    const parentDocId = `parent_${childUid}`; // Create a unique parent document ID
+    // FIRST: Check if a parent document with this email already exists
+    const parentsRef = collection(db, 'parents');
+    const q = query(parentsRef, where("email", "==", trimmedEmail));
+    const querySnapshot = await getDocs(q);
     
-    const parentRef = doc(db, 'parents', parentDocId);
-    const parentSnap = await getDoc(parentRef);
+    let parentDocId: string;
     
-    if (parentSnap.exists()) {
-      // Update existing parent document
-      await updateDoc(parentRef, {
-        linkedChildren: arrayUnion(childUid),
-        updatedAt: Timestamp.now()
-      });
+    if (!querySnapshot.empty) {
+      // Parent exists! Use existing parent document (even if linkedChildren is empty)
+      const existingParentDoc = querySnapshot.docs[0];
+      parentDocId = existingParentDoc.id;
+      const existingData = existingParentDoc.data();
+      const currentChildren = existingData.linkedChildren || [];
+      
+      // Add this child to existing parent's linkedChildren array (avoid duplicates)
+      if (!currentChildren.includes(trimmedChildUid)) {
+        await updateDoc(doc(db, 'parents', parentDocId), {
+          linkedChildren: [...currentChildren, trimmedChildUid],
+          updatedAt: Timestamp.now()
+        });
+        console.log(`Child ${trimmedChildUid} ADDED to EXISTING parent ${parentDocId}`);
+        console.log(`Previous children:`, currentChildren);
+        console.log(`New children list:`, [...currentChildren, trimmedChildUid]);
+      } else {
+        console.log(`Child ${trimmedChildUid} already linked to parent ${parentDocId}`);
+      }
     } else {
-      // Create new parent document
+      // No parent exists with this email - create a brand new one
+      parentDocId = `parent_${Date.now()}_${trimmedChildUid.substring(0, 8)}`;
+      const parentRef = doc(db, 'parents', parentDocId);
+      
       await setDoc(parentRef, {
-        email: parentEmail,
-        linkedChildren: [childUid],
+        email: trimmedEmail,
+        linkedChildren: [trimmedChildUid],
         hasPassword: false,
-        childUid: childUid,  // Store reference to child
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now()
       });
+      console.log(`NEW parent document created: ${parentDocId} for email ${trimmedEmail}`);
     }
     
     // Update child's document with parent link
-    const childRef = doc(db, 'users', childUid);
+    const childRef = doc(db, 'users', trimmedChildUid);
     await updateDoc(childRef, {
       linkedParentId: parentDocId,
     });
     
-    console.log(`Child ${childUid} linked to parent ${parentDocId}`);
     return parentDocId;
   } catch (error) {
     console.error("Error linking child to parent:", error);
