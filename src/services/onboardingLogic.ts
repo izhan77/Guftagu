@@ -465,6 +465,7 @@ export const saveSessionInteraction = async (
 
 // src/services/onboardingLogic.ts
 // REPLACE the entire linkChildToParent function
+// Links a child UID to a parent email record so the parent dashboard can load child progress.
 
 export const linkChildToParent = async (parentEmail: string, childUid: string): Promise<string> => {
   try {
