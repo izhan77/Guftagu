@@ -59,6 +59,7 @@ const CHAR_CONFIG: Record<
 };
 
 const MIN_RECORDING_DURATION = 800; // Minimum recording duration in ms (0.8 seconds)
+// Keep sessions short for children and ensure completion progress is reached predictably.
 const MAX_EXCHANGES = 5;
 
 export default function SessionScreen({ navigation, route }: any) {
