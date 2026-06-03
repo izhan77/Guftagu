@@ -3,7 +3,7 @@ import {
   signOut,
   User,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, addDoc, collection, Timestamp, deleteField, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, addDoc, collection, Timestamp, deleteField, query, where, getDocs, arrayUnion } from 'firebase/firestore';
 import { auth, db } from '../services/firebase/config';
 import {
   saveUserSession,
@@ -205,7 +205,7 @@ export const saveAgeConsent = async (
       ageConsent: true,
       parentConsent: !needsParentConsent,
       timestamp: getCurrentTimestamp(),
-      nickname: existingSession?.nickname || null,
+      nickname: existingSession?.nickname || undefined,
     });
 
     console.log(`Age saved (${wasOverridden ? 'OVERRIDE' : 'NEW'}): age=${age}, needsParent=${needsParentConsent}`);
@@ -461,48 +461,47 @@ export const saveSessionInteraction = async (
   }
 };
 
-export const linkChildToParent = async (
-  parentEmail: string,
-  childUid: string
-): Promise<string> => {
-  // Check if parent already exists
-  const parentsRef = collection(db, 'parents');
-  const q = query(parentsRef, where('email', '==', parentEmail.toLowerCase()));
-  const querySnapshot = await getDocs(q);
-  
-  let parentId: string;
-  
-  if (!querySnapshot.empty) {
-    // Parent exists - add child to existing parent
-    const parentDoc = querySnapshot.docs[0];
-    parentId = parentDoc.id;
-  const existingChildren = parentDoc.data().linkedChildren || [];
-const updatedChildren = existingChildren.includes(childUid)
-  ? existingChildren
-  : [...existingChildren, childUid];
-await updateDoc(doc(db, 'parents', parentId), {
-  linkedChildren: updatedChildren,
-  updatedAt: Timestamp.now()
-});
-  } else {
-    // Create new parent account (no password yet - will be set later)
-    const newParentRef = await addDoc(collection(db, 'parents'), {
-      email: parentEmail,
-      linkedChildren: [childUid],
-      hasPassword: false,  // Parent hasn't set password yet
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now()
+export const linkChildToParent = async (parentEmail: string, childUid: string): Promise<string> => {
+  try {
+    // IMPORTANT: The parent needs their OWN anonymous sign-in
+    // But since we're already authenticated as the child, we need to
+    // create a SEPARATE parent document with the child's UID as reference
+    
+    // For now, use the child's UID as a reference, but store it properly
+    const parentDocId = `parent_${childUid}`; // Create a unique parent document ID
+    
+    const parentRef = doc(db, 'parents', parentDocId);
+    const parentSnap = await getDoc(parentRef);
+    
+    if (parentSnap.exists()) {
+      // Update existing parent document
+      await updateDoc(parentRef, {
+        linkedChildren: arrayUnion(childUid),
+        updatedAt: Timestamp.now()
+      });
+    } else {
+      // Create new parent document
+      await setDoc(parentRef, {
+        email: parentEmail,
+        linkedChildren: [childUid],
+        hasPassword: false,
+        childUid: childUid,  // Store reference to child
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      });
+    }
+    
+    // Update child's document with parent link
+    const childRef = doc(db, 'users', childUid);
+    await updateDoc(childRef, {
+      linkedParentId: parentDocId,
     });
-    parentId = newParentRef.id;
+    
+    console.log(`Child ${childUid} linked to parent ${parentDocId}`);
+    return parentDocId;
+  } catch (error) {
+    console.error("Error linking child to parent:", error);
+    throw error;
   }
-  
-  // Update child's document with parent link
-  const childRef = doc(db, 'users', childUid);
-  await updateDoc(childRef, {
-    linkedParentId: parentId,
-    // Keep email in parent collection only - NOT in child doc
-  });
-  
-  return parentId;
 };
 

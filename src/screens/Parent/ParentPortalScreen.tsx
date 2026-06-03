@@ -13,7 +13,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { collection, query, where, getDocs } from "firebase/firestore";
-import { db } from "../../services/firebase/config";
+import { signInAnonymously } from "firebase/auth";
+import { auth, db } from "../../services/firebase/config";
 
 export default function ParentPortalScreen({ navigation }: any) {
   const [email, setEmail] = useState("");
@@ -27,7 +28,10 @@ export default function ParentPortalScreen({ navigation }: any) {
 
     setIsLoading(true);
     try {
-      // Query parents collection by email
+      // Sign in anonymously to authenticate
+      await signInAnonymously(auth);
+      
+      // Query parents collection by email (not by UID)
       const parentsRef = collection(db, "parents");
       const q = query(parentsRef, where("email", "==", email.trim().toLowerCase()));
       const querySnapshot = await getDocs(q);
@@ -40,20 +44,19 @@ export default function ParentPortalScreen({ navigation }: any) {
         return;
       }
 
-      // Get the first matching parent document (email should be unique)
+      // Get the first matching parent document
       const parentDoc = querySnapshot.docs[0];
       const parentData = parentDoc.data();
       const linkedChildren = parentData.linkedChildren || [];
 
       if (linkedChildren.length === 0) {
-        Alert.alert(
-          "No Children Found",
-          "This parent account has no linked children. Please check your setup."
-        );
+        Alert.alert("No Children Found", "This parent account has no linked children.");
         return;
       }
 
-      // Navigate to ParentDashboardScreen with all child UIDs
+      console.log("Found parent document:", parentDoc.id);
+      console.log("Linked children:", linkedChildren);
+
       navigation.navigate("ParentDashboard", {
         childUids: linkedChildren,
         parentId: parentDoc.id,
@@ -80,7 +83,7 @@ export default function ParentPortalScreen({ navigation }: any) {
 
           <Text style={styles.title}>Parent Portal</Text>
           <Text style={styles.subtitle}>
-            Enter the email you used when setting up your child's profile to view their progress.
+            Enter the email you used when setting up your child's profile.
           </Text>
 
           <View style={styles.inputWrapper}>
@@ -109,13 +112,6 @@ export default function ParentPortalScreen({ navigation }: any) {
               <Text style={styles.btnText}>View My Child's Progress →</Text>
             )}
           </TouchableOpacity>
-
-          <View style={styles.privacyNote}>
-            <Ionicons name="lock-closed-outline" size={14} color="#AAAAAA" />
-            <Text style={styles.privacyText}>
-              No password required. Your email is verified securely.
-            </Text>
-          </View>
         </View>
       </SafeAreaView>
     </LinearGradient>
@@ -178,11 +174,4 @@ const styles = StyleSheet.create({
   },
   btnDisabled: { backgroundColor: "#CCCCCC" },
   btnText: { color: "white", fontSize: 15, fontFamily: "Poppins-Bold" },
-  privacyNote: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 16,
-  },
-  privacyText: { fontSize: 11, fontFamily: "Poppins-Medium", color: "#AAAAAA" },
 });

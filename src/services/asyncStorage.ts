@@ -10,6 +10,8 @@ export interface UserSession {
   parentConsent?: boolean;
   nickname?: string;
   onboardingComplete?: boolean;
+  lastSessionScore?: number;  
+  lastSessionDate?: string;   
 }
 
 const SESSION_KEY = 'guftagu_user_session';

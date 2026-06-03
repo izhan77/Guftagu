@@ -89,7 +89,7 @@ export default function NameInputScreen({ navigation, route }: any) {
       // Sanitize the nickname before saving
       const sanitizedName = sanitizeNickname(name);
       await saveChildProfile(sanitizedName);
-      navigation.navigate("CharacterSelect", {
+      navigation.replace("CharacterSelect", {  // 🔥 CHANGE: navigate → replace
         name: sanitizedName,
         ageGroup,
         fromOnboarding: true,
@@ -99,6 +99,17 @@ export default function NameInputScreen({ navigation, route }: any) {
       Alert.alert("Error", "Could not save your nickname. Please try again.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // 🔥 FIXED: Handle back button properly
+  const handleGoBack = () => {
+    // Check if we can go back in navigation stack
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      // If no screen to go back to, go to AgeInput
+      navigation.replace("AgeInput");
     }
   };
 
@@ -146,7 +157,7 @@ export default function NameInputScreen({ navigation, route }: any) {
               ]}>
                 <TouchableOpacity
                   style={styles.backBtnContainer}
-                  onPress={() => navigation.goBack()}
+                  onPress={handleGoBack}  // 🔥 FIXED: Use handleGoBack instead of navigation.goBack
                   activeOpacity={0.7}
                 >
                   <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
@@ -292,7 +303,7 @@ const styles = StyleSheet.create({
     color: "#2D2D2D",
     textAlign: "center",
     lineHeight: width > 400 ? 48 : 42,
-    marginTop: 22,
+    marginTop: 32,
   },
   subtitle: {
     fontSize: width > 400 ? 16 : 14,
