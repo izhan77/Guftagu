@@ -80,7 +80,8 @@ const getEmojiDisplayName = (emoji: string): string => {
 };
 
 /**
- * Validate nickname with comprehensive rules (NO EMOJIS)
+ * Validate child nickname before profile creation.
+ * Allows simple readable names and blocks emojis or unsupported symbols.
  */
 export const validateNickname = (nickname: string): ValidationResult => {
   const trimmed = nickname.trim();
