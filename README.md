@@ -116,3 +116,6 @@ Academic Project — SZABIST University, Karachi
 - **GitHub Repository:** [github.com/izhan77/Guftagu](https://github.com/izhan77/Guftagu)
 - **Supervisor:** Muhammad Suleman
 - **Course:** CSC-4101 Artificial Intelligence, Spring 2026
+
+
+<img width="1254" height="1254" alt="Image" src="https://github.com/user-attachments/assets/3ea3f519-584a-46f6-8d9b-3fc2f3cef62e" />
