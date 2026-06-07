@@ -1,3 +1,4 @@
+// src/screens/Main/SessionScreen.tsx
 import React, { useState, useRef, useEffect } from "react";
 import {
   View,
@@ -6,436 +7,643 @@ import {
   StyleSheet,
   Dimensions,
   Animated,
-  SafeAreaView,
+  Platform,
+  Modal,
   ScrollView,
+  Alert,
 } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { LinearGradient } from "expo-linear-gradient";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { BlurView } from "expo-blur";
 import { Audio } from "expo-av";
-import { useFirestoreSync } from "../../hooks/useFirestoreSync";
-
-// import { getCharacterResponse } from "../../services/gemini";
 import { getCharacterResponse } from "../../services/openai";
 import { getCharacterAudio } from "../../services/elevenlabs";
 import { transcribeAudio } from "../../services/whisper";
+import { analyzeExchange, calculateExchangeScore, ExchangeMetrics } from "../../services/scoring";
+import { ExchangeData } from "../../services/sessionService";
 
-const { width, height } = Dimensions.get("window");
+const { height } = Dimensions.get("window");
 
-const CHAR_ASSETS: Record<string, { idle: any; talking: any }> = {
+const CHAR_CONFIG: Record<
+  string,
+  {
+    idle: any;
+    talking: any;
+    gradientTop: string;
+    gradientBottom: string;
+    buttonColor: string;
+  }
+> = {
   zara: {
     idle: require("../../../assets/videos/zara/zara_idle.mp4"),
     talking: require("../../../assets/videos/zara/zara_talking.mp4"),
+    gradientTop: "#F4EDFF",
+    gradientBottom: "#E0D4FF",
+    buttonColor: "#7C5CBF",
   },
   robo: {
     idle: require("../../../assets/videos/robo_bhaya/robo_idle.mp4"),
     talking: require("../../../assets/videos/robo_bhaya/robo_talking.mp4"),
+    gradientTop: "#E8F4FD",
+    gradientBottom: "#BBDEFB",
+    buttonColor: "#2196F3",
   },
   ustad: {
     idle: require("../../../assets/videos/ustad_sahab/ustad_idle.mp4"),
     talking: require("../../../assets/videos/ustad_sahab/ustad_talking.mp4"),
+    gradientTop: "#EAF7EE",
+    gradientBottom: "#C8E6C9",
+    buttonColor: "#4CAF50",
   },
 };
+
+const MIN_RECORDING_DURATION = 800; // Minimum recording duration in ms (0.8 seconds)
+const MAX_EXCHANGES = 5;
 
 export default function SessionScreen({ navigation, route }: any) {
   const { character, childName } = route.params || {};
   const charId =
-    character?.id && CHAR_ASSETS[character.id] ? character.id : "zara";
-  const themeColor = character?.buttonColor || "#FF9500";
-  const activeAssets = CHAR_ASSETS[charId];
+    character?.id && CHAR_CONFIG[character.id] ? character.id : "zara";
+  const cfg = CHAR_CONFIG[charId];
+  const themeColor = cfg.buttonColor;
 
-  const [status, setStatus] = useState<
+  const [appStatus, setAppStatus] = useState<
     "idle" | "listening" | "thinking" | "talking"
   >("idle");
   const [chat, setChat] = useState<{ role: string; text: string }[]>([]);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const recordingRef = useRef<Audio.Recording | null>(null);
+  const recordingStartTime = useRef<number>(0);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [openingShown, setOpeningShown] = useState(false);
-  const talkingEndTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [exchangeCount, setExchangeCount] = useState(0);
+  const [showChatModal, setShowChatModal] = useState(false);
+  const [showTalkVideo, setShowTalkVideo] = useState(false);
+  const [exchangeHistory, setExchangeHistory] = useState<ExchangeData[]>([]);
+  const sessionStartTime = useRef<number>(Date.now());
 
-  useFirestoreSync(navigation);
-
-  const talkOpacity = useRef(new Animated.Value(0)).current;
+  // Animation refs
   const micScale = useRef(new Animated.Value(1)).current;
+  const micGlowAnim = useRef(new Animated.Value(0)).current;
+  const recordingPulse = useRef<any>(null);
+  const timerRef = useRef<any>(null);
   const scrollRef = useRef<ScrollView>(null);
 
-  // Video players with error handling
-  const idlePlayer = useVideoPlayer(activeAssets.idle, (p) => {
+  const idlePlayer = useVideoPlayer(cfg.idle, (p) => {
     p.loop = true;
     p.muted = true;
-    try {
-      p.play();
-    } catch (e) {
-      console.log("Idle player error:", e);
-    }
+    p.play();
   });
 
-  const talkPlayer = useVideoPlayer(activeAssets.talking, (p) => {
+  const talkPlayer = useVideoPlayer(cfg.talking, (p) => {
     p.loop = true;
     p.muted = true;
   });
 
-  // Safe pause/play functions
-  const safePauseTalkPlayer = () => {
-    try {
-      if (talkPlayer) {
-        talkPlayer.pause();
-      }
-    } catch (e) {
-      console.log("Pause error (ignored):", e);
-    }
-  };
-
-  const safePlayTalkPlayer = () => {
-    try {
-      if (talkPlayer) {
-        talkPlayer.play();
-      }
-    } catch (e) {
-      console.log("Play error (ignored):", e);
-    }
-  };
-
-  // Video transition with error handling
   useEffect(() => {
-    if (status === "talking") {
-      safePlayTalkPlayer();
-      Animated.timing(talkOpacity, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: true,
-      }).start();
+    if (appStatus === "talking") {
+      idlePlayer.pause();
+      talkPlayer.currentTime = 0;
+      talkPlayer.play();
+      setShowTalkVideo(true);
     } else {
-      Animated.timing(talkOpacity, {
-        toValue: 0,
-        duration: 400,
-        useNativeDriver: true,
-      }).start(() => {
-        safePauseTalkPlayer();
-      });
+      setShowTalkVideo(false);
+      talkPlayer.pause();
+      try {
+        idlePlayer.play();
+      } catch (_) {}
     }
-  }, [status]);
+  }, [appStatus]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (sound) {
-        try {
-          sound.unloadAsync();
-        } catch (e) {}
+        try { sound.unloadAsync(); } catch (_) {}
       }
-      if (recording) {
+      if (recordingRef.current) {
         try {
-          recording.stopAndUnloadAsync();
-        } catch (e) {}
+          recordingRef.current.stopAndUnloadAsync();
+        } catch (_) {}
+        recordingRef.current = null;
       }
+      if (timerRef.current) clearTimeout(timerRef.current);
+      if (recordingPulse.current) recordingPulse.current.stop();
+      try { idlePlayer.pause(); } catch (_) {}
+      try { talkPlayer.pause(); } catch (_) {}
     };
-  }, [sound, recording]);
+  }, [sound]);
 
-  // Opening message
   useEffect(() => {
     if (!openingShown) {
       const openings: Record<string, string> = {
-        zara: `Yaar ${childName}! Finally you're here! Main kaab se wait kar rahi thi. Bolo — kya chal raha hai life mein? 😄`,
-        robo: `BEEP BOOP! Hello ${childName}! I am Robo Bhaya. Ready for an EPIC conversation? 🤖`,
-        ustad: `Aaao beta, baithao. ${childName} — bahut pyaara naam hai. Tum ready ho? ☕`,
+        zara: `Yaar ${childName}! Finally you're here! Bolo kya chal raha hai?`,
+        robo: `BEEP BOOP! Hello ${childName}! Ready for an EPIC conversation?`,
+        ustad: `Aaao beta, baithao. ${childName} — bahut pyaara naam hai.`,
       };
-
-      const opening = openings[charId] || openings.zara;
-
       setTimeout(() => {
-        setChat([{ role: "ai", text: opening }]);
+        setChat([{ role: "assistant", text: openings[charId] || openings.zara }]);
         setOpeningShown(true);
-      }, 500);
+      }, 800);
     }
   }, []);
 
-  const handlePressIn = async () => {
-    try {
-      // Stop any existing recording first
-      if (recording) {
-        try {
-          await recording.stopAndUnloadAsync();
-        } catch (e) {}
-        setRecording(null);
-      }
-
-      // Request permissions
-      const { status: permissionStatus } =
-        await Audio.requestPermissionsAsync();
-      if (permissionStatus !== "granted") {
-        console.log("Permission not granted");
-        setStatus("idle");
-        return;
-      }
-
-      // Configure audio mode for recording
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
-      });
-
-      // Create new recording
-      const { recording: newRecording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY,
-      );
-
-      setRecording(newRecording);
-      setStatus("listening");
-
-      Animated.spring(micScale, {
-        toValue: 1.3,
-        useNativeDriver: true,
-      }).start();
-    } catch (err) {
-      console.error("Recording Start Error:", err);
-      setStatus("idle");
-      // Reset audio mode on error
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-      });
-    }
+  const startRecordingAnimation = () => {
+    // Continuous pulse animation while recording
+    recordingPulse.current = Animated.loop(
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(micScale, { toValue: 1.15, duration: 500, useNativeDriver: true }),
+          Animated.timing(micGlowAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+        ]),
+        Animated.parallel([
+          Animated.timing(micScale, { toValue: 1, duration: 500, useNativeDriver: true }),
+          Animated.timing(micGlowAnim, { toValue: 0.4, duration: 500, useNativeDriver: true }),
+        ]),
+      ])
+    );
+    recordingPulse.current.start();
   };
 
-  const handlePressOut = async () => {
-    if (!recording) {
-      setStatus("idle");
+  const stopRecordingAnimation = () => {
+    if (recordingPulse.current) {
+      recordingPulse.current.stop();
+    }
+    Animated.parallel([
+      Animated.spring(micScale, { toValue: 1, tension: 40, friction: 7, useNativeDriver: true }),
+      Animated.timing(micGlowAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const startRecording = async () => {
+    if (isProcessing || appStatus === "thinking" || appStatus === "talking") {
       return;
     }
 
-    Animated.spring(micScale, { toValue: 1, useNativeDriver: true }).start();
-    setStatus("thinking");
+    setIsProcessing(true);
 
     try {
-      // Stop recording
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
+      // Clean up any existing recording
+      if (recordingRef.current) {
+        try {
+          await recordingRef.current.stopAndUnloadAsync();
+        } catch (_) {}
+        recordingRef.current = null;
+        setRecording(null);
+      }
+
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission required", "Microphone access is needed for speaking practice.");
+        setIsProcessing(false);
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const { recording: newRecording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      recordingRef.current = newRecording;
+      setRecording(newRecording);
+      recordingStartTime.current = Date.now();
+      setAppStatus("listening");
+      startRecordingAnimation();
+    } catch (error) {
+      console.error("Failed to start recording:", error);
+      setAppStatus("idle");
+      Alert.alert("Error", "Could not start recording. Please try again.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const stopRecording = async () => {
+    if (isProcessing) return;
+    if (!recordingRef.current) {
+      setAppStatus("idle");
+      return;
+    }
+
+    setIsProcessing(true);
+    stopRecordingAnimation();
+    setAppStatus("thinking");
+
+    try {
+      const recordingDuration = Date.now() - recordingStartTime.current;
+      
+      await recordingRef.current.stopAndUnloadAsync();
+      const uri = recordingRef.current.getURI();
+      recordingRef.current = null;
       setRecording(null);
 
-      // Reset audio mode
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
         playsInSilentModeIOS: true,
       });
 
       if (!uri) {
-        console.log("No recording URI");
-        setStatus("idle");
+        setAppStatus("idle");
+        setIsProcessing(false);
         return;
       }
 
-      // ✅ USE REAL TRANSCRIPTION (not mock)
+      // Check if recording is too short
+      if (recordingDuration < MIN_RECORDING_DURATION) {
+        Alert.alert(
+          "Recording too short",
+          "Please speak for at least 1 second before stopping.",
+          [{ text: "OK", onPress: () => setAppStatus("idle") }]
+        );
+        setIsProcessing(false);
+        return;
+      }
+
       const userSpeech = await transcribeAudio(uri);
-      const finalUserText = userSpeech || "I love biryani from Burns Road!";
+      
+      if (!userSpeech || userSpeech.trim().length === 0) {
+        Alert.alert(
+          "No speech detected",
+          "We couldn't hear you. Please try speaking louder or check your microphone.",
+          [{ text: "OK", onPress: () => setAppStatus("idle") }]
+        );
+        setIsProcessing(false);
+        return;
+      }
 
-      setChat((prev) => [...prev, { role: "user", text: finalUserText }]);
+      const finalText = userSpeech.trim();
 
-      // Get AI response
-      const aiText = await getCharacterResponse(
-        finalUserText,
-        charId,
-        childName,
-        [...chat, { role: "user", text: finalUserText }],
-      );
+      // Analyze exchange metrics
+      const metrics: ExchangeMetrics = analyzeExchange(finalText);
+      const exchangeScore = calculateExchangeScore(metrics);
 
-      setChat((prev) => [...prev, { role: "ai", text: aiText }]);
+      setChat((prev) => [...prev, { role: "user", text: finalText }]);
 
-      // ✅ PLAY CHARACTER VOICE via ElevenLabs
+      let aiText;
+      try {
+        aiText = await getCharacterResponse(finalText, charId, childName, chat);
+      } catch (error) {
+        console.error("Character response error:", error);
+        Alert.alert("Connection Error", "Failed to get a response. Please try again.");
+        setAppStatus("idle");
+        setIsProcessing(false);
+        return;
+      }
+
+      setChat((prev) => [...prev, { role: "assistant", text: aiText }]);
+
+      const newExchangeNumber = exchangeCount + 1;
+      const newExchange: ExchangeData = {
+        exchangeNumber: newExchangeNumber,
+        childTranscript: finalText,
+        wordCount: metrics.wordCount,
+        fillerCount: metrics.fillerWordCount,
+        sentenceCount: metrics.sentenceCount,
+        avgSentenceLength: metrics.avgSentenceLength,
+        characterResponse: aiText,
+        exchangeScore: exchangeScore,
+        detectedMood: undefined,
+      };
+      setExchangeHistory(prev => [...prev, newExchange]);
+      setExchangeCount(newExchangeNumber);
+
       const base64Audio = await getCharacterAudio(aiText, charId);
-
       if (base64Audio) {
         const { sound: newSound } = await Audio.Sound.createAsync(
           { uri: base64Audio },
-          { shouldPlay: true },
+          { shouldPlay: true }
         );
         setSound(newSound);
-        setStatus("talking");
-
-        newSound.setOnPlaybackStatusUpdate((playbackStatus) => {
-          if (playbackStatus.isLoaded && playbackStatus.didJustFinish) {
-            setStatus("idle");
+        setAppStatus("talking");
+        newSound.setOnPlaybackStatusUpdate((ps) => {
+          if (ps.isLoaded && ps.didJustFinish) {
             newSound.unloadAsync();
+            if (newExchangeNumber >= MAX_EXCHANGES) {
+              const totalDuration = (Date.now() - sessionStartTime.current) / 1000;
+              navigation.navigate("SessionComplete", {
+                childName,
+                character,
+                exchangeHistory: [...exchangeHistory, newExchange],
+                sessionDuration: totalDuration,
+                sessionTip: "",
+              });
+            } else {
+              setAppStatus("idle");
+            }
           }
         });
       } else {
-        // Fallback: Just show text, no voice
-        setStatus("talking");
-        if (talkingEndTimer.current) clearTimeout(talkingEndTimer.current);
+        setAppStatus("talking");
         const readMs = Math.min(8000, Math.max(2500, aiText.length * 45));
-        talkingEndTimer.current = setTimeout(() => setStatus("idle"), readMs);
+        timerRef.current = setTimeout(() => {
+          if (newExchangeNumber >= MAX_EXCHANGES) {
+            const totalDuration = (Date.now() - sessionStartTime.current) / 1000;
+            navigation.navigate("SessionComplete", {
+              childName,
+              character,
+              exchangeHistory: [...exchangeHistory, newExchange],
+              sessionDuration: totalDuration,
+              sessionTip: "",
+            });
+          } else {
+            setAppStatus("idle");
+          }
+        }, readMs);
       }
+
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (error) {
-      console.error("Session Error:", error);
-      setStatus("idle");
+      console.error("Recording stop error:", error);
+      recordingRef.current = null;
+      setRecording(null);
+      setAppStatus("idle");
+      Alert.alert("Recording Error", "Could not process your speech. Please try again.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const cancelRecording = () => {
+    if (recordingRef.current) {
+      try {
+        recordingRef.current.stopAndUnloadAsync();
+      } catch (_) {}
+      recordingRef.current = null;
+      setRecording(null);
+    }
+    stopRecordingAnimation();
+    setAppStatus("idle");
+  };
+
+  const glowOpacity = micGlowAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.6] });
+
+  const getStatusLabel = () => {
+    switch (appStatus) {
+      case "listening":
+        return "🔴 Recording... Tap the mic again to stop";
+      case "thinking":
+        return `🤔 ${character?.name} is thinking... Please wait!`;
+      case "talking":
+        return `💬 ${character?.name} is speaking...`;
+      default:
+        return "🎙️ Tap the mic to start speaking!";
     }
   };
 
   return (
-    <View style={styles.container}>
-      {/* LAYER 1: IDLE */}
-      <View style={StyleSheet.absoluteFill}>
-        <VideoView
-          player={idlePlayer}
-          style={styles.fullVideo}
-          contentFit="cover"
-          nativeControls={false}
-        />
-      </View>
-
-      {/* LAYER 2: TALKING */}
-      <Animated.View
-        style={[StyleSheet.absoluteFill, { opacity: talkOpacity }]}
-      >
-        <VideoView
-          player={talkPlayer}
-          style={styles.fullVideo}
-          contentFit="cover"
-          nativeControls={false}
-        />
-      </Animated.View>
-
-      <LinearGradient
-        colors={["rgba(0,0,0,0.4)", "transparent", "rgba(0,0,0,0.8)"]}
-        style={StyleSheet.absoluteFill}
-      />
-
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backBtn}
-          >
-            <Ionicons name="chevron-back" size={28} color="white" />
+    <View style={styles.root}>
+      <LinearGradient colors={[cfg.gradientTop, cfg.gradientBottom]} style={styles.characterSection}>
+        <VideoView player={idlePlayer} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} surfaceType="textureView" />
+        {showTalkVideo && (
+          <View style={StyleSheet.absoluteFill}>
+            <VideoView player={talkPlayer} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} surfaceType="textureView" />
+          </View>
+        )}
+        <LinearGradient colors={["transparent", cfg.gradientBottom + "CC", cfg.gradientBottom]} style={styles.characterBottomMask} locations={[0.45, 0.75, 1]} pointerEvents="none" />
+        <SafeAreaView style={styles.topBar}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={28} color={themeColor} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{character?.name || "Zara"}</Text>
-          <View style={{ width: 44 }} />
-        </View>
+          <View style={styles.starsRow}>
+            {Array.from({ length: MAX_EXCHANGES }).map((_, i) => (
+              <Text key={i} style={[styles.star, i < exchangeCount && styles.starFilled]}>
+                {i < exchangeCount ? "⭐" : "☆"}
+              </Text>
+            ))}
+          </View>
+          <View style={[styles.statusPill, { backgroundColor: themeColor + "22" }]}>
+            <Text style={[styles.statusPillText, { color: themeColor }]}>
+              {appStatus === "idle" ? "Ready" : appStatus === "listening" ? "🔴" : appStatus === "thinking" ? "🤔" : "💬"}
+            </Text>
+          </View>
+        </SafeAreaView>
+      </LinearGradient>
 
-        <ScrollView
-          ref={scrollRef}
-          style={styles.chatArea}
-          contentContainerStyle={{ paddingBottom: 20 }}
-          onContentSizeChange={() =>
-            scrollRef.current?.scrollToEnd({ animated: true })
-          }
-        >
-          {chat.map((msg, i) => (
-            <View
-              key={i}
-              style={msg.role === "ai" ? styles.aiMsg : styles.userMsg}
-            >
-              <BlurView intensity={40} tint="dark" style={styles.bubble}>
-                <Text style={styles.msgText}>{msg.text}</Text>
-              </BlurView>
-            </View>
-          ))}
-
-          {status === "thinking" && (
-            <View style={styles.aiMsg}>
-              <BlurView intensity={30} tint="dark" style={styles.bubble}>
-                <Text style={styles.msgText}>🤔 Thinking...</Text>
-              </BlurView>
-            </View>
+      <LinearGradient colors={[cfg.gradientBottom, "#FFFFFF"]} style={styles.bottomSection}>
+        <TouchableOpacity style={styles.seeChatsBtn} onPress={() => setShowChatModal(true)} activeOpacity={0.7}>
+          <Ionicons name="chatbubbles-outline" size={22} color={themeColor} />
+          <Text style={[styles.seeChatsBtnText, { color: themeColor }]}>See all chats ({chat.length})</Text>
+          <Ionicons name="chevron-up" size={18} color={themeColor} />
+        </TouchableOpacity>
+        
+        <Text style={styles.statusLabel}>{getStatusLabel()}</Text>
+        
+        {/* Larger Mic Area - moved up */}
+        <View style={styles.micArea}>
+          {/* Cancel button - only shown when recording */}
+          {appStatus === "listening" && (
+            <TouchableOpacity style={styles.cancelBtn} onPress={cancelRecording} activeOpacity={0.8}>
+              <Ionicons name="close-circle" size={32} color="#FF3B30" />
+              <Text style={styles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
           )}
-        </ScrollView>
-
-        <View style={styles.footer}>
+          
+          <Animated.View style={[styles.micGlowRing, { borderColor: appStatus === "listening" ? "#FF3B30" : themeColor, opacity: glowOpacity, transform: [{ scale: micScale }] }]} />
+          <Animated.View style={[styles.micGlowRingInner, { borderColor: appStatus === "listening" ? "#FF3B30" : themeColor, opacity: appStatus === "listening" ? 0.3 : 0, transform: [{ scale: micScale }] }]} />
+          
           <Animated.View style={{ transform: [{ scale: micScale }] }}>
             <TouchableOpacity
-              onPressIn={handlePressIn}
-              onPressOut={handlePressOut}
-              disabled={status === "talking" || status === "thinking"}
+              onPress={appStatus === "listening" ? stopRecording : startRecording}
+              disabled={appStatus === "thinking" || appStatus === "talking" || isProcessing}
+              activeOpacity={0.85}
               style={[
                 styles.micBtn,
-                {
-                  backgroundColor:
-                    status === "listening" ? "#FF3B30" : themeColor,
-                },
+                { backgroundColor: appStatus === "listening" ? "#FF3B30" : themeColor },
+                (appStatus === "thinking" || appStatus === "talking") && styles.micBtnDisabled
               ]}
             >
-              <Ionicons
-                name={status === "listening" ? "mic-outline" : "mic"}
-                size={44}
-                color="white"
+              <Ionicons 
+                name={appStatus === "listening" ? "mic" : appStatus === "thinking" ? "hourglass-outline" : appStatus === "talking" ? "volume-high" : "mic"} 
+                size={56} 
+                color="white" 
               />
             </TouchableOpacity>
           </Animated.View>
-          <Text style={styles.statusLabel}>
-            {status === "listening"
-              ? "I'm listening..."
-              : status === "thinking"
-                ? "Thinking..."
-                : status === "talking"
-                  ? "Speaking..."
-                  : "Hold to Talk"}
+          
+          <Text style={styles.micHint}>
+            {appStatus === "listening" ? "Tap again to stop" : "Tap to start speaking"}
           </Text>
         </View>
-      </SafeAreaView>
+      </LinearGradient>
+
+      {/* Chat Modal */}
+      <Modal visible={showChatModal} animationType="slide" transparent onRequestClose={() => setShowChatModal(false)}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Chat with {character?.name}</Text>
+            <TouchableOpacity onPress={() => setShowChatModal(false)} style={styles.modalCloseBtn}>
+              <Ionicons name="close" size={28} color="#555" />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.modalChatContent} showsVerticalScrollIndicator={true} ref={scrollRef}>
+            {chat.map((msg, index) => (
+              <View key={index} style={{ 
+                marginBottom: 16, 
+                alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                backgroundColor: msg.role === 'user' ? themeColor : '#F0F0F0',
+                padding: 14,
+                borderRadius: 20,
+                maxWidth: '85%',
+                borderTopRightRadius: msg.role === 'user' ? 6 : 20,
+                borderTopLeftRadius: msg.role === 'assistant' ? 6 : 20,
+              }}>
+                <Text style={{ 
+                  color: msg.role === 'user' ? 'white' : '#333', 
+                  fontSize: 16, 
+                  fontFamily: 'Poppins-Medium',
+                  lineHeight: 24,
+                }}>
+                  {msg.text}
+                </Text>
+              </View>
+            ))}
+            {chat.length === 0 && (
+              <View style={styles.emptyChatContainer}>
+                <Text style={styles.emptyChatEmoji}>💬</Text>
+                <Text style={styles.emptyChatText}>No messages yet. Start talking!</Text>
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#000" },
-  fullVideo: { width: width, height: height },
-  safeArea: { flex: 1, zIndex: 10 },
-  header: {
-    flexDirection: "row",
+  root: { flex: 1 },
+  characterSection: { height: height * 0.58, position: "relative", overflow: "hidden" },
+  characterBottomMask: { position: "absolute", bottom: 0, left: 0, right: 0, height: height * 0.22, zIndex: 10 },
+  topBar: { position: "absolute", top: 0, left: 0, right: 0, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: Platform.OS === "android" ? 40 : 12, zIndex: 20 },
+  backBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.9)", alignItems: "center", justifyContent: "center", elevation: 3, shadowOpacity: 0.1, shadowRadius: 6 },
+  starsRow: { flexDirection: "row", gap: 8, alignItems: "center" },
+  star: { fontSize: 24, color: "#CCCCCC" },
+  starFilled: { color: "#FFD700" },
+  statusPill: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
+  statusPillText: { fontSize: 12, fontFamily: "Poppins-Bold", letterSpacing: 0.5 },
+  bottomSection: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "space-between",
-    padding: 20,
-    marginTop: 20,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: Platform.OS === "ios" ? 40 : 32,
   },
-  backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#7C5CBF",
-    justifyContent: "center",
+  seeChatsBtn: {
+    flexDirection: "row",
     alignItems: "center",
-  },
-  headerTitle: {
-    color: "white",
-    fontSize: 24,
-    fontWeight: "900",
-    letterSpacing: 1,
-  },
-  chatArea: { flex: 1, paddingHorizontal: 20 },
-  aiMsg: { alignSelf: "flex-start", marginVertical: 8, maxWidth: "85%" },
-  userMsg: { alignSelf: "flex-end", marginVertical: 8, maxWidth: "85%" },
-  bubble: {
-    padding: 18,
-    borderRadius: 28,
-    overflow: "hidden",
+    gap: 8,
+    backgroundColor: "rgba(255,255,255,0.7)",
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 99,
     borderWidth: 1.5,
-    borderColor: "rgba(255,255,255,0.15)",
+    borderColor: "rgba(255,255,255,0.9)",
+    elevation: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
   },
-  msgText: { color: "white", fontSize: 18, fontWeight: "600", lineHeight: 24 },
-  footer: { paddingBottom: 60, alignItems: "center" },
-  micBtn: {
+  seeChatsBtnText: { fontSize: 13, fontFamily: "Poppins-SemiBold" },
+  statusLabel: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#555555",
+    textAlign: "center",
+    marginTop: 16,
+  },
+  micArea: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 20,
+    marginBottom: 30,
+  },
+  micGlowRing: {
+    position: "absolute",
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 4,
+  },
+  micGlowRingInner: {
+    position: "absolute",
     width: 100,
     height: 100,
     borderRadius: 50,
-    justifyContent: "center",
-    alignItems: "center",
-    elevation: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
+    borderWidth: 2,
   },
-  statusLabel: {
-    color: "white",
-    marginTop: 20,
-    fontSize: 14,
-    fontWeight: "800",
-    opacity: 0.9,
-    textTransform: "uppercase",
-    letterSpacing: 2,
+  micBtn: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+  },
+  micBtnDisabled: {
+    opacity: 0.45,
+  },
+  micHint: {
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#AAAAAA",
+    marginTop: 16,
+  },
+  cancelBtn: {
+    position: "absolute",
+    top: -50,
+    alignItems: "center",
+    zIndex: 10,
+  },
+  cancelText: {
+    fontSize: 11,
+    fontFamily: "Poppins-Medium",
+    color: "#FF3B30",
+    marginTop: 4,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'white',
+    marginTop: 50,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEE',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: 'Poppins-Bold',
+    color: '#1A1A2E',
+  },
+  modalCloseBtn: {
+    padding: 8,
+  },
+  modalChatContent: {
+    flex: 1,
+    padding: 20,
+  },
+  emptyChatContainer: {
+    alignItems: 'center',
+    marginTop: 50,
+  },
+  emptyChatEmoji: {
+    fontSize: 56,
+    marginBottom: 10,
+  },
+  emptyChatText: {
+    color: '#AAA',
+    fontSize: 16,
+    fontFamily: 'Poppins-Medium',
   },
 });

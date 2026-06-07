@@ -13,6 +13,8 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { auth, db } from "../../services/firebase/config";
 import { useFirestoreSync } from "../../hooks/useFirestoreSync";
 
 const { width, height } = Dimensions.get("window");
@@ -54,15 +56,20 @@ const CHARACTERS = [
 ];
 
 export default function CharacterSelectScreen({ navigation, route }: any) {
-  const { 
-    name: childName = "Buddy", 
+  const {
+    name: childName = "Buddy",
     ageGroup = "10-14",
-    fromOnboarding = false  // ← NEW: track if coming from onboarding
+    fromOnboarding = false,
+    preselectedCharacterId = null,
   } = route.params || {};
-  
-  const [index, setIndex] = useState(0);
 
-  // Add Firestore listener to detect if data was deleted
+  const [index, setIndex] = useState(
+    preselectedCharacterId
+      ? CHARACTERS.findIndex((c) => c.id === preselectedCharacterId)
+      : 0,
+  );
+  const [hasExistingCharacter, setHasExistingCharacter] = useState(false);
+
   useFirestoreSync(navigation);
 
   // Animation Refs
@@ -90,6 +97,21 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
         }),
       ]),
     ).start();
+  }, []);
+
+  // Check if user already has a character (for showing Dashboard FAB)
+  useEffect(() => {
+    const checkExistingCharacter = async () => {
+      const user = auth.currentUser;
+      if (user) {
+        const userRef = doc(db, "users", user.uid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists() && userSnap.data()?.chosenCharacter) {
+          setHasExistingCharacter(true);
+        }
+      }
+    };
+    checkExistingCharacter();
   }, []);
 
   const animateSwitch = (newIndex: number, direction: "left" | "right") => {
@@ -130,13 +152,59 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
     outputRange: [0, -15],
   });
 
+  // Handle character selection (bond reset on switch)
+  const handlePickCharacter = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      navigation.navigate("Session", {
+        childName: childName,
+        ageGroup: ageGroup,
+        character: current,
+      });
+      return;
+    }
+
+    try {
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+      const currentCharacter = userSnap.data()?.chosenCharacter;
+
+      if (currentCharacter && currentCharacter !== current.id) {
+        await updateDoc(userRef, {
+          characterBondLevel: 10,
+          characterBondTier: "New",
+        });
+        console.log(`Switched from ${currentCharacter} to ${current.id} – bond reset to 10`);
+      } else if (!currentCharacter) {
+        await updateDoc(userRef, {
+          characterBondLevel: 10,
+          characterBondTier: "New",
+        });
+        console.log("First character selected – bond initialized to 10");
+      }
+    } catch (error) {
+      console.error("Failed to handle bond on character selection:", error);
+    }
+
+    navigation.navigate("Session", {
+      childName: childName,
+      ageGroup: ageGroup,
+      character: current,
+    });
+  };
+
+  // Go directly to Dashboard
+  const goToDashboard = () => {
+    navigation.replace("Dashboard");
+  };
+
   return (
     <LinearGradient
       colors={[current.gradientTop, current.gradientBottom]}
       style={styles.container}
     >
       <SafeAreaView style={styles.safe}>
-        {/* ✅ Show back button ONLY when coming from onboarding */}
+        {/* Back Button - Only show when coming from onboarding */}
         {fromOnboarding && (
           <TouchableOpacity
             style={styles.backBtnContainer}
@@ -146,7 +214,7 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
             <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
         )}
-        
+
         {/* Header Section */}
         <View style={styles.header}>
           <Text style={styles.greeting}>Hey {childName}! 👋</Text>
@@ -254,18 +322,25 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
               styles.mainButton,
               { backgroundColor: current.buttonColor },
             ]}
-            onPress={() =>
-              navigation.navigate("Session", {
-                childName: childName,
-                ageGroup: ageGroup,
-                character: current,
-              })
-            }
+            onPress={handlePickCharacter}
           >
-            <Text style={styles.buttonText}>Choose {current.name}!</Text>
+            <Text style={styles.buttonText}>Pick {current.name}!</Text>
             <Ionicons name="arrow-forward" size={22} color="white" />
           </TouchableOpacity>
         </View>
+
+        {/* FAB Button to Dashboard - Only shows if child has existing character */}
+        {hasExistingCharacter && !fromOnboarding && (
+          <TouchableOpacity style={styles.dashboardFab} onPress={goToDashboard} activeOpacity={0.9}>
+            <LinearGradient 
+              colors={[current.buttonColor, current.buttonColor + "CC"]} 
+              style={styles.dashboardFabGradient}
+            >
+              <Ionicons name="home-outline" size={22} color="white" />
+              <Text style={styles.dashboardFabText}>Dashboard</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
       </SafeAreaView>
     </LinearGradient>
   );
@@ -273,6 +348,8 @@ export default function CharacterSelectScreen({ navigation, route }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  safe: { flex: 1, paddingHorizontal: 20 },
+  
   backBtnContainer: {
     width: 45,
     height: 45,
@@ -283,11 +360,11 @@ const styles = StyleSheet.create({
     marginTop: 25,
     shadowColor: "#7C5CBF",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.4,
     shadowRadius: 5,
     elevation: 5,
   },
-  safe: { flex: 1, paddingHorizontal: 20 },
+  
   header: { alignItems: "center", marginTop: 30, zIndex: 10 },
   greeting: { fontSize: 26, fontFamily: "Poppins-ExtraBold", color: "#000000" },
   title: {
@@ -296,6 +373,7 @@ const styles = StyleSheet.create({
     color: "#2D2D2D",
     textAlign: "center",
   },
+  
   characterStage: {
     flex: 1,
     justifyContent: "center",
@@ -358,12 +436,13 @@ const styles = StyleSheet.create({
     zIndex: 4,
     borderRadius: 60,
   },
+  
   infoCard: {
     backgroundColor: "white",
     borderRadius: 30,
     padding: 24,
     alignItems: "center",
-    marginBottom: 50,
+    marginBottom: 70,
     elevation: 8,
     shadowColor: "#000",
     shadowOpacity: 0.1,
@@ -395,4 +474,30 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   buttonText: { color: "white", fontSize: 18, fontFamily: "Poppins-Bold" },
+  
+  // FAB Button to Dashboard
+  dashboardFab: {
+    position: "absolute",
+    bottom: 20,
+    right: 20,
+    borderRadius: 30,
+    overflow: "hidden",
+    elevation: 8,
+    shadowColor: "#7C5CBF",
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+  },
+  dashboardFabGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 30,
+  },
+  dashboardFabText: {
+    color: "white",
+    fontSize: 14,
+    fontFamily: "Poppins-Bold",
+  },
 });
